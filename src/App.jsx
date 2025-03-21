@@ -6,6 +6,8 @@ import {Route, Routes} from "react-router-dom";
 import Category from "./components/Category.jsx";
 import EquipmentList from "./components/EquipmentList.jsx";
 import Maintenance from "./components/Maintenance.jsx";
+import AuthModal from "./components/AuthModal.jsx";
+import Borrowing from "./components/Borrowing.jsx";
 
 function App() {
 
@@ -18,6 +20,8 @@ function App() {
                     <Route path="/category" element={<Category/>}/>
                     <Route path="/equipments" element={<EquipmentList/>}/>
                     <Route path="/maintenance" element={<Maintenance/>}/>
+                    <Route path="/borrowing" element={<Borrowing/>}/>
+                    <Route path="/users" element={<AuthModal/>}/>
                 </Routes>
             </div>
             <Footer/>
