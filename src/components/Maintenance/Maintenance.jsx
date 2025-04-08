@@ -125,6 +125,8 @@ export default function Maintenance() {
                         <th className="py-4 px-6 text-left font-semibold">{t('maintenanceDate')}</th>
                         <th className="py-4 px-6 text-left font-semibold w-80">{t('description')}</th>
                         <th className="py-4 px-6 text-left font-semibold">{t('status')}</th>
+                        <th className="py-4 px-6 text-left font-semibold w-80">{t('cost')}</th>
+                        <th className="py-4 px-6 text-left font-semibold w-80">{t('technician')}</th>
                         <th className="py-4 px-6 font-semibold">{t('actions')}</th>
                     </tr>
                     </thead>
@@ -148,6 +150,8 @@ export default function Maintenance() {
                     )}
                   </span>
                             </td>
+                            <td className="py-4 px-6 text-gray-800">{maintenance.description}</td>
+                            <td className="py-4 px-6 text-gray-800">{maintenance.description}</td>
                             <td className="py-4 px-6 text-center">
                                 <div className="flex justify-center gap-3">
                                     <button

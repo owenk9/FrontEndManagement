@@ -9,17 +9,17 @@ import { useTranslation } from 'react-i18next';
 export default function Category() {
     const { t } = useTranslation();
 
-    const [categoryData, setCategoryData] = useState([
-        { id: 1, name: 'Presentation Equipment', description: 'Projectors, screens' },
-        { id: 2, name: 'Computers', description: 'PCs, laptops' },
-        { id: 3, name: 'Audio Equipment', description: 'Speakers, microphones' },
-    ]);
+    // const [categoryData, setCategoryData] = useState([
+    //     { id: 1, name: 'Presentation Equipment', description: 'Projectors, screens' },
+    //     { id: 2, name: 'Computers', description: 'PCs, laptops' },
+    //     { id: 3, name: 'Audio Equipment', description: 'Speakers, microphones' },
+    // ]);
 
+    const [categoryData, setCategoryData] = useState([]);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [newCategoryData, setNewCategoryData] = useState({
-        id: '',
         name: '',
         description: '',
     });

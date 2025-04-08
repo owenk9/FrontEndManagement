@@ -60,27 +60,34 @@ i18n
                     statusBroken: 'Broken',
                     purchaseDate: 'Purchase Date',
                     enterEquipmentName: 'Enter equipment name',
+                    quantity: 'Quantity',
+                    enterQuantity: 'Enter quantity',
 
                     //  EquipmentList
                     equipments: 'Equipments',
                     addEquipment: 'Add Equipment',
                     fillRequiredEquipmentFields: 'Please fill in all required fields: ID, Name, Purchase Date',
+                    image: "Image",
 
                     //  Maintenance
                     maintenance: 'Maintenance',
                     maintenanceDate: 'Maintenance Date',
+                    cost: 'Cost',
+                    technician: 'Technician',
 
                     //  Location
                     locations: 'Locations',
                     locationName: 'Location Name',
-                    equipment: 'Equipment', // Số lượng thiết bị ở bảng chính
-                    addEquipmentToLocation: 'Add Equipment to Location', // Tiêu đề modal
-                    fillRequiredEquipmentFieldsForLocation: 'Please fill in all required fields: ID, Name', // Thông báo lỗi
+                    equipment: 'Equipment',
+                    addEquipmentToLocation: 'Add Equipment to Location',
+                    fillRequiredEquipmentFieldsForLocation: 'Please fill in all required fields: ID, Name',
 
+                    // NavBar
+                    home: 'Home',
                     // EditEquipment
                     editEquipment: 'Edit Equipment',
 
-                    //  DeleteConfirmationModal
+                    //  DeleteConfirmation
                     confirmDelete: 'Confirm Delete',
                     areYouSureDeleteEquipment: 'Are you sure you want to delete',
                     yes: 'Yes',
@@ -125,6 +132,24 @@ i18n
                     role: 'Role',
                     viewProfile: 'View Profile',
                     logout: 'Logout',
+
+                    // Home
+                    welcome: 'Welcome',
+                    homeDescription: 'Manage your equipment efficiently with UEMS.',
+                    totalEquipments: 'Total Equipments',
+                    borrowingCount: 'Active Borrowings',
+                    maintenanceCount: 'Under Maintenance',
+                    recentNotifications: 'Recent Notifications',
+                    noNotifications: 'No recent notifications.',
+                    manageEquipments: 'View and manage all equipments',
+                    manageBorrowing: 'Track borrowing records',
+                    manageMaintenance: 'Schedule and track maintenance',
+
+
+                    // Pagination
+                    previous: 'Previous', // Thêm Previous
+                    next: 'Next', // Thêm Next
+                    page: 'Page',
                 },
             },
             vi: {
@@ -182,15 +207,20 @@ i18n
                     statusBroken: 'Hỏng',
                     purchaseDate: 'Ngày mua',
                     enterEquipmentName: 'Nhập tên thiết bị',
+                    quantity: 'Số lượng', // Thêm quantity
+                    enterQuantity: 'Nhập số lượng',
 
                     //  EquipmentList
                     equipments: 'Thiết bị',
                     addEquipment: 'Thêm thiết bị',
                     fillRequiredEquipmentFields: 'Vui lòng điền đầy đủ các trường bắt buộc: Mã, Tên, Ngày mua',
+                    image: "Hình ảnh",
 
                     //  Maintenance
                     maintenance: 'Bảo trì',
                     maintenanceDate: 'Ngày bảo trì',
+                    cost: 'Giá',
+                    technician: 'Thợ bảo trì',
 
                     //  Location
                     locations: 'Vị trí',
@@ -251,6 +281,23 @@ i18n
                     role: 'Vai trò',
                     viewProfile: 'Xem hồ sơ',
                     logout: 'Đăng xuất',
+
+                    // Home
+                    welcome: 'Chào mừng',
+                    homeDescription: 'Quản lý thiết bị của bạn hiệu quả với UEMS.',
+                    totalEquipments: 'Tổng số thiết bị',
+                    borrowingCount: 'Số lượt mượn đang hoạt động',
+                    maintenanceCount: 'Đang bảo trì',
+                    recentNotifications: 'Thông báo gần đây',
+                    noNotifications: 'Không có thông báo gần đây.',
+                    manageEquipments: 'Xem và quản lý tất cả thiết bị',
+                    manageBorrowing: 'Theo dõi hồ sơ mượn',
+                    manageMaintenance: 'Lên lịch và theo dõi bảo trì',
+
+                    // Pagination
+                    previous: 'Trang trước', // Thêm Previous
+                    next: 'Trang sau', // Thêm Next
+                    page: 'Trang', // Thêm Page
                 },
             },
         },

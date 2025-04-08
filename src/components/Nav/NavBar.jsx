@@ -56,7 +56,7 @@ export default function NavBar() {
                                 onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
                             >
                                 <img src={users} alt="User" className="w-5 h-5" />
-                                <span className="text-black">{currentUser.fullName}</span> {/* Hiển thị tên người dùng */}
+                                <span className="text-black">{currentUser.fullName}</span>
                             </div>
                             {isUserDropdownOpen && (
                                 <div className="absolute bottom-full left-0 w-full bg-white border border-gray-300 rounded-lg shadow-lg mb-2">
