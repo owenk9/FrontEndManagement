@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-export default function EditEquipment({ isOpen, onClose, onSave, equipment, onInputChange, onImageChange }) {
+export default function EditEquipment({ isOpen, onClose, onSave, equipment, onInputChange, onImageChange, locations, categories }) {
     const { t } = useTranslation();
 
     if (!isOpen) return null;
@@ -33,15 +33,6 @@ export default function EditEquipment({ isOpen, onClose, onSave, equipment, onIn
                 </div>
                 <div className="mb-4">
                     <label className="block text-gray-700 font-semibold mb-1">{t('image')}</label>
-                    {equipment.imageUrl && (
-                        <div className="mb-2">
-                            <img
-                                src={equipment.imageUrl}
-                                alt="Current equipment"
-                                className="w-16 h-16 object-cover rounded"
-                            />
-                        </div>
-                    )}
                     <input
                         type="file"
                         name="image"
@@ -88,28 +79,38 @@ export default function EditEquipment({ isOpen, onClose, onSave, equipment, onIn
                     />
                 </div>
                 <div className="mb-4">
-                    <label className="block text-gray-700 font-semibold mb-1">{t('categoryId')}</label>
-                    <input
-                        type="number"
+                    <label className="block text-gray-700 font-semibold mb-1">{t('category')}</label>
+                    <select
                         name="categoryId"
                         value={equipment.categoryId}
                         onChange={onInputChange}
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
-                        placeholder="Enter Category ID"
                         required
-                    />
+                    >
+                        <option value="">{t('selectCategory')}</option>
+                        {categories.map((category) => (
+                            <option key={category.id} value={category.id}>
+                                {category.categoryName}
+                            </option>
+                        ))}
+                    </select>
                 </div>
                 <div className="mb-4">
-                    <label className="block text-gray-700 font-semibold mb-1">{t('locationId')}</label>
-                    <input
-                        type="number"
+                    <label className="block text-gray-700 font-semibold mb-1">{t('location')}</label>
+                    <select
                         name="locationId"
                         value={equipment.locationId}
                         onChange={onInputChange}
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
-                        placeholder="Enter Location ID"
                         required
-                    />
+                    >
+                        <option value="">{t('selectLocation')}</option>
+                        {locations.map((location) => (
+                            <option key={location.id} value={location.id}>
+                                {location.locationName}
+                            </option>
+                        ))}
+                    </select>
                 </div>
                 <div className="mb-4">
                     <label className="block text-gray-700 font-semibold mb-1">{t('description')}</label>
