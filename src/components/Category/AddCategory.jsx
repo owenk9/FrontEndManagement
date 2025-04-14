@@ -11,24 +11,24 @@ export default function AddCategory({ isOpen, onClose, onSave, newCategory, onIn
             <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/30">
                 <div className="bg-white rounded-lg shadow-xl w-96 max-w-[90%] p-6 pointer-events-auto">
                     <h2 className="text-xl font-bold text-gray-900 mb-4">{t('addNewCategory')}</h2>
-                    <div className="mb-4">
-                        <label className="block text-gray-700 font-semibold mb-1">{t('id')}</label>
-                        <input
-                            type="number"
-                            name="id"
-                            value={newCategory.id}
-                            onChange={onInputChange}
-                            className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
-                            placeholder={t('enterId')}
-                            required
-                        />
-                    </div>
+                    {/*<div className="mb-4">*/}
+                    {/*    <label className="block text-gray-700 font-semibold mb-1">{t('id')}</label>*/}
+                    {/*    <input*/}
+                    {/*        type="number"*/}
+                    {/*        name="id"*/}
+                    {/*        value={newCategory.id}*/}
+                    {/*        onChange={onInputChange}*/}
+                    {/*        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"*/}
+                    {/*        placeholder={t('enterId')}*/}
+                    {/*        required*/}
+                    {/*    />*/}
+                    {/*</div>*/}
                     <div className="mb-4">
                         <label className="block text-gray-700 font-semibold mb-1">{t('categoryName')}</label>
                         <input
                             type="text"
-                            name="name"
-                            value={newCategory.name}
+                            name="categoryName"
+                            value={newCategory.categoryName}
                             onChange={onInputChange}
                             className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
                             placeholder={t('enterCategoryName')}

@@ -1,43 +1,87 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import SearchBar from '../Nav/SearchBar.jsx';
 import AddCategoryModal from './AddCategory.jsx';
-import EditCategory from './EditCategory.jsx'; // Import modal chỉnh sửa
-import DeleteCategory from './DeleteCategory.jsx'; // Import modal xóa
+import EditCategory from './EditCategory.jsx';
+import DeleteCategory from './DeleteCategory.jsx';
 import { Pencil, Trash2, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 export default function Category() {
     const { t } = useTranslation();
 
-    // const [categoryData, setCategoryData] = useState([
-    //     { id: 1, name: 'Presentation Equipment', description: 'Projectors, screens' },
-    //     { id: 2, name: 'Computers', description: 'PCs, laptops' },
-    //     { id: 3, name: 'Audio Equipment', description: 'Speakers, microphones' },
-    // ]);
-
     const [categoryData, setCategoryData] = useState([]);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [newCategoryData, setNewCategoryData] = useState({
-        name: '',
+        categoryName: '',
         description: '',
     });
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [categoryToDelete, setCategoryToDelete] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [currentPage, setCurrentPage] = useState(0);
+    const [totalPages, setTotalPages] = useState(1);
+    const [pageSize] = useState(10);
+    const [searchTerm] = useState('');
+
+    const BASE_URL = 'http://localhost:9090';
+
+    const fetchCategoryData = async (page = 0, search = '') => {
+        try {
+            const url = search
+                ? `${BASE_URL}/category/get?name=${encodeURIComponent(search)}&page=${page}&size=${pageSize}`
+                : `${BASE_URL}/category/get?page=${page}&size=${pageSize}`;
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            if (!response.ok) throw new Error(t('fetchError'));
+            const data = await response.json();
+            setCategoryData(data.content || []);
+            setTotalPages(data.totalPages || 1);
+            // setCurrentPage(data.number || page);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Xử lý tìm kiếm thời gian thực
+    const handleSearch = (term) => {
+        fetchCategoryData(currentPage, term);
+        // setCurrentPage(0); // Reset về trang đầu khi tìm kiếm
+    };
+
+    useEffect(() => {
+        setLoading(true);
+        fetchCategoryData(currentPage, searchTerm);
+    }, [currentPage, searchTerm]);
 
     const handleOpenAddModal = () => {
         setIsAddModalOpen(true);
     };
 
-    const handleAddCategory = () => {
-        if (!newCategoryData.id || !newCategoryData.name) {
+    const handleAddCategory = async () => {
+        if (!newCategoryData.categoryName) {
             alert(t('fillRequiredFields'));
             return;
         }
-        setCategoryData([...categoryData, { ...newCategoryData, id: parseInt(newCategoryData.id) }]);
-        setNewCategoryData({ id: '', name: '', description: '' });
-        setIsAddModalOpen(false);
+        try {
+            const response = await fetch(`${BASE_URL}/category/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newCategoryData),
+            });
+            if (!response.ok) throw new Error(t('addError'));
+            setNewCategoryData({ categoryName: '', description: '' });
+            setIsAddModalOpen(false);
+            fetchCategoryData(currentPage, searchTerm);
+        } catch (err) {
+            alert(err.message);
+        }
     };
 
     const handleOpenEditModal = (category) => {
@@ -45,17 +89,27 @@ export default function Category() {
         setIsEditModalOpen(true);
     };
 
-    const handleEditCategory = () => {
-        if (!selectedCategory.name) {
+    const handleEditCategory = async () => {
+        if (!selectedCategory.categoryName) {
             alert(t('fillRequiredFields'));
             return;
         }
-        const updatedCategories = categoryData.map((item) =>
-            item.id === selectedCategory.id ? selectedCategory : item
-        );
-        setCategoryData(updatedCategories);
-        setIsEditModalOpen(false);
-        setSelectedCategory(null);
+        try {
+            const response = await fetch(`${BASE_URL}/category/update/${selectedCategory.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    categoryName: selectedCategory.categoryName,
+                    description: selectedCategory.description,
+                }),
+            });
+            if (!response.ok) throw new Error(t('updateError'));
+            setIsEditModalOpen(false);
+            setSelectedCategory(null);
+            fetchCategoryData(currentPage, searchTerm);
+        } catch (err) {
+            alert(err.message);
+        }
     };
 
     const handleOpenDeleteModal = (category) => {
@@ -63,10 +117,19 @@ export default function Category() {
         setIsDeleteModalOpen(true);
     };
 
-    const handleDeleteCategory = () => {
-        setCategoryData(categoryData.filter((item) => item.id !== categoryToDelete.id));
-        setIsDeleteModalOpen(false);
-        setCategoryToDelete(null);
+    const handleDeleteCategory = async () => {
+        try {
+            const response = await fetch(`${BASE_URL}/category/delete/${categoryToDelete.id}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            if (!response.ok) throw new Error(t('deleteError'));
+            setIsDeleteModalOpen(false);
+            setCategoryToDelete(null);
+            fetchCategoryData(currentPage, searchTerm);
+        } catch (err) {
+            alert(err.message);
+        }
     };
 
     const handleInputChange = (e) => {
@@ -79,13 +142,53 @@ export default function Category() {
         setSelectedCategory((prev) => ({ ...prev, [name]: value }));
     };
 
+    const handlePageChange = (page) => {
+        if (page >= 0 && page < totalPages) {
+            setLoading(true);
+            setCurrentPage(page);
+        }
+    };
+
+    // Tạo danh sách số trang
+    const renderPageNumbers = () => {
+        const pageNumbers = [];
+        const maxPagesToShow = 5;
+        let startPage = Math.max(0, currentPage - Math.floor(maxPagesToShow / 2));
+        let endPage = Math.min(totalPages - 1, startPage + maxPagesToShow - 1);
+
+        if (endPage - startPage + 1 < maxPagesToShow) {
+            startPage = Math.max(0, endPage - maxPagesToShow + 1);
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            pageNumbers.push(
+                <button
+                    key={i}
+                    onClick={() => handlePageChange(i)}
+                    className={`px-3 py-1 rounded-md ${
+                        currentPage === i
+                            ? 'bg-black text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                >
+                    {i + 1}
+                </button>
+            );
+        }
+
+        return pageNumbers;
+    };
+
+    if (loading) return <div className="min-h-screen p-6 min-w-full flex items-center justify-center"><p>{t('loading')}</p></div>;
+    if (error) return <div className="min-h-screen p-6 min-w-full flex items-center justify-center"><p className="text-red-600">{t('error')}: {error}</p></div>;
+
     return (
         <div className="min-h-screen p-6 min-w-full overflow-auto">
             <div className="mb-6">
                 <h1 className="text-3xl font-bold text-gray-900">{t('category')}</h1>
             </div>
             <div className="mb-6 flex justify-between items-center">
-                <SearchBar />
+                <SearchBar onSearch={handleSearch} />
                 <button
                     className="flex items-center gap-2 bg-black text-white py-2 px-4 rounded-md hover:bg-gray-700 transition duration-200"
                     onClick={handleOpenAddModal}
@@ -108,7 +211,7 @@ export default function Category() {
                     {categoryData.map((category) => (
                         <tr key={category.id} className="border-t border-gray-200 hover:bg-gray-50">
                             <td className="py-4 px-6 text-gray-800">{category.id}</td>
-                            <td className="py-4 px-6 text-gray-800">{category.name}</td>
+                            <td className="py-4 px-6 text-gray-800">{category.categoryName}</td>
                             <td className="py-4 px-6 text-gray-800">{category.description}</td>
                             <td className="py-4 px-6 text-center">
                                 <div className="flex justify-center gap-3">
@@ -130,9 +233,32 @@ export default function Category() {
                     ))}
                     </tbody>
                 </table>
+                {/* Phân trang nằm trong bảng, căn phải */}
+                <div className="flex justify-end items-center p-4">
+                    <div className="flex gap-2">
+                        <button
+                            className={`px-3 py-1 rounded-md ${
+                                currentPage === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-700'
+                            }`}
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 0}
+                        >
+                            {t('previous')}
+                        </button>
+                        {renderPageNumbers()}
+                        <button
+                            className={`px-3 py-1 rounded-md ${
+                                currentPage === totalPages - 1 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-700'
+                            }`}
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages - 1}
+                        >
+                            {t('next')}
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            {/* Modal thêm danh mục */}
             <AddCategoryModal
                 isOpen={isAddModalOpen}
                 onClose={() => setIsAddModalOpen(false)}
@@ -140,8 +266,6 @@ export default function Category() {
                 newCategory={newCategoryData}
                 onInputChange={handleInputChange}
             />
-
-            {/* Modal chỉnh sửa danh mục */}
             <EditCategory
                 isOpen={isEditModalOpen}
                 onClose={() => setIsEditModalOpen(false)}
@@ -149,13 +273,11 @@ export default function Category() {
                 category={selectedCategory || {}}
                 onInputChange={handleEditInputChange}
             />
-
-            {/* Modal xóa danh mục */}
             <DeleteCategory
                 isOpen={isDeleteModalOpen}
                 onClose={() => setIsDeleteModalOpen(false)}
                 onConfirm={handleDeleteCategory}
-                categoryName={categoryToDelete?.name || ''}
+                categoryName={categoryToDelete?.categoryName || ''}
             />
         </div>
     );

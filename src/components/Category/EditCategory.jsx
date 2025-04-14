@@ -24,8 +24,8 @@ export default function EditCategory({ isOpen, onClose, onSave, category, onInpu
                     <label className="block text-gray-700 font-semibold mb-1">{t('categoryName')}</label>
                     <input
                         type="text"
-                        name="name"
-                        value={category.name}
+                        name="categoryName"
+                        value={category.categoryName}
                         onChange={onInputChange}
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
                         placeholder={t('enterCategoryName')}

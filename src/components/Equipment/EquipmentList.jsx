@@ -50,7 +50,6 @@ export default function EquipmentList() {
             const data = await response.json();
             setEquipmentData(data.content || []);
             setTotalPages(data.totalPages || 1);
-            // setCurrentPage(data.number || page);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -60,7 +59,7 @@ export default function EquipmentList() {
 
     const fetchCategories = async () => {
         try {
-            const response = await fetch(`${BASE_URL}/category/get-all?page=0&size=10`, {
+            const response = await fetch(`${BASE_URL}/category/get?page=0&size=10`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
@@ -242,7 +241,7 @@ export default function EquipmentList() {
     };
 
     const handlePageChange = (page) => {
-        if (page >= 0 && page < totalPages) {
+        if (page >= 0 && page < totalPages && page !== currentPage) {
             setLoading(true);
             setCurrentPage(page);
         }

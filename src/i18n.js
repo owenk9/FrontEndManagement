@@ -51,7 +51,7 @@ i18n
                     //  Category
                     category: 'Category',
                     addCategory: 'Add Category',
-                    fillRequiredFields: 'Please fill in all required fields: ID, Name',
+                    // fillRequiredFields: 'Please fill in all required fields: ID, Name',
 
                     //  AddEquipment
                     addNewEquipment: 'Add New Equipment',
@@ -205,7 +205,7 @@ i18n
                     //  Category
                     category: 'Danh mục',
                     addCategory: 'Thêm danh mục',
-                    fillRequiredFields: 'Vui lòng điền đầy đủ các trường bắt buộc: Mã, Tên',
+
 
                     //  AddEquipment
                     addNewEquipment: 'Thêm thiết bị mới',
