@@ -68,6 +68,10 @@ i18n
                     addEquipment: 'Add Equipment',
                     fillRequiredEquipmentFields: 'Please fill in all required fields: ID, Name, Purchase Date',
                     image: "Image",
+                    location: "Location",
+                    selectCategory: 'Select Category',
+                    selectLocation: 'Select Location',
+                    noImage: 'No image',
 
                     //  Maintenance
                     maintenance: 'Maintenance',
@@ -150,6 +154,9 @@ i18n
                     previous: 'Previous', // Thêm Previous
                     next: 'Next', // Thêm Next
                     page: 'Page',
+
+                    // Search bar
+                    searchByEquipmentName: 'Search by name',
                 },
             },
             vi: {
@@ -215,6 +222,11 @@ i18n
                     addEquipment: 'Thêm thiết bị',
                     fillRequiredEquipmentFields: 'Vui lòng điền đầy đủ các trường bắt buộc: Mã, Tên, Ngày mua',
                     image: "Hình ảnh",
+                    location: "Địa điểm",
+                    selectLocation: "Chọn địa điểm",
+                    selectCategory: "Chọn danh mục",
+                    noImage: 'Không có hình ảnh',
+
 
                     //  Maintenance
                     maintenance: 'Bảo trì',
@@ -295,9 +307,12 @@ i18n
                     manageMaintenance: 'Lên lịch và theo dõi bảo trì',
 
                     // Pagination
-                    previous: 'Trang trước', // Thêm Previous
-                    next: 'Trang sau', // Thêm Next
-                    page: 'Trang', // Thêm Page
+                    previous: 'Trang trước',
+                    next: 'Trang sau',
+                    page: 'Trang',
+
+                    // Search bar
+                    searchByEquipmentName: 'Tìm kiếm theo tên ',
                 },
             },
         },

@@ -10,16 +10,6 @@ export default function EditEquipment({ isOpen, onClose, onSave, equipment, onIn
             <div className="bg-white rounded-lg shadow-xl w-96 max-w-[90%] p-6 pointer-events-auto">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">{t('editEquipment')}</h2>
                 <div className="mb-4">
-                    <label className="block text-gray-700 font-semibold mb-1">{t('id')}</label>
-                    <input
-                        type="number"
-                        name="id"
-                        value={equipment.id}
-                        className="w-full p-2 border border-gray-300 rounded-md bg-gray-100"
-                        disabled
-                    />
-                </div>
-                <div className="mb-4">
                     <label className="block text-gray-700 font-semibold mb-1">{t('equipmentName')}</label>
                     <input
                         type="text"
@@ -27,7 +17,6 @@ export default function EditEquipment({ isOpen, onClose, onSave, equipment, onIn
                         value={equipment.name}
                         onChange={onInputChange}
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
-                        placeholder={t('enterEquipmentName')}
                         required
                     />
                 </div>
@@ -49,9 +38,9 @@ export default function EditEquipment({ isOpen, onClose, onSave, equipment, onIn
                         onChange={onInputChange}
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
                     >
-                        <option value="Active">Active</option>
-                        <option value="Maintenance">Maintenance</option>
-                        <option value="Broken">Broken</option>
+                        <option value="Active">{t('statusActive')}</option>
+                        <option value="Broken">{t('statusBroken')}</option>
+                        <option value="Maintenance">{t('statusMaintenance')}</option>
                     </select>
                 </div>
                 <div className="mb-4">
@@ -73,7 +62,6 @@ export default function EditEquipment({ isOpen, onClose, onSave, equipment, onIn
                         value={equipment.quantity}
                         onChange={onInputChange}
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
-                        placeholder={t('enterQuantity')}
                         min="1"
                         required
                     />
@@ -119,7 +107,6 @@ export default function EditEquipment({ isOpen, onClose, onSave, equipment, onIn
                         value={equipment.description}
                         onChange={onInputChange}
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
-                        placeholder={t('enterDescription')}
                         rows="3"
                     />
                 </div>

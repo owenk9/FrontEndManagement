@@ -39,9 +39,9 @@ export default function AddEquipment({ isOpen, onClose, onSave, newEquipment, on
                         onChange={onInputChange}
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
                     >
-                        <option value="Active">Active</option>
-                        <option value="Maintenance">Maintenance</option>
-                        <option value="Broken">Broken</option>
+                        <option value="Active">{t('statusActive')}</option>
+                        <option value="Broken">{t('statusBroken')}</option>
+                        <option value="Maintenance">{t('statusMaintenance')}</option>
                     </select>
                 </div>
                 <div className="mb-4">
