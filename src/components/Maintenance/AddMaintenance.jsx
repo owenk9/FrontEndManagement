@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-export default function AddMaintenance({ isOpen, onClose, onSave, newMaintenance, onInputChange }) {
+export default function AddMaintenance({ isOpen, onClose, onSave, newMaintenance, onInputChange, equipments }) {
     const { t } = useTranslation();
 
     if (!isOpen) return null;
@@ -10,33 +10,26 @@ export default function AddMaintenance({ isOpen, onClose, onSave, newMaintenance
             <div className="bg-white rounded-lg shadow-xl w-96 max-w-[90%] p-6 pointer-events-auto">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">{t('addMaintenance')}</h2>
                 <div className="mb-4">
-                    <label className="block text-gray-700 font-semibold mb-1">{t('id')}</label>
-                    <input
-                        type="number"
-                        name="id"
-                        value={newMaintenance.id}
+                    <label className="block text-gray-700 font-semibold mb-1">{t('equipment')}</label>
+                    <select
+                        name="equipmentId"
+                        value={newMaintenance.equipmentId}
                         onChange={onInputChange}
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
-                        placeholder={t('enterId')}
                         required
-                    />
-                </div>
-                <div className="mb-4">
-                    <label className="block text-gray-700 font-semibold mb-1">{t('equipmentName')}</label>
-                    <input
-                        type="text"
-                        name="name"
-                        value={newMaintenance.name}
-                        onChange={onInputChange}
-                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
-                        placeholder={t('enterEquipmentName')}
-                        required
-                    />
+                    >
+                        <option value="">{t('selectEquipment')}</option>
+                        {equipments.map((equipment) => (
+                            <option key={equipment.id} value={equipment.id}>
+                                {equipment.name}
+                            </option>
+                        ))}
+                    </select>
                 </div>
                 <div className="mb-4">
                     <label className="block text-gray-700 font-semibold mb-1">{t('maintenanceDate')}</label>
                     <input
-                        type="date"
+                        type="datetime-local"
                         name="maintenanceDate"
                         value={newMaintenance.maintenanceDate}
                         onChange={onInputChange}
@@ -63,10 +56,38 @@ export default function AddMaintenance({ isOpen, onClose, onSave, newMaintenance
                         onChange={onInputChange}
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
                     >
-                        <option value="Hoạt động">{t('statusActive')}</option>
-                        <option value="Bảo trì">{t('statusMaintenance')}</option>
-                        <option value="Hỏng">{t('statusBroken')}</option>
+                        <option value="Pending">{t('statusPending')}</option>
+                        <option value="In Progress">{t('statusInProgress')}</option>
+                        <option value="Waiting for Parts">{t('statusWaitingForParts')}</option>
+                        <option value="Completed">{t('statusCompleted')}</option>
+                        <option value="Canceled">{t('statusCanceled')}</option>
                     </select>
+                </div>
+                <div className="mb-4">
+                    <label className="block text-gray-700 font-semibold mb-1">{t('cost')}</label>
+                    <input
+                        type="number"
+                        name="cost"
+                        value={newMaintenance.cost}
+                        onChange={onInputChange}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
+                        placeholder={t('enterCost')}
+                        min="0"
+                        step="0.01"
+                        required
+                    />
+                </div>
+                <div className="mb-4">
+                    <label className="block text-gray-700 font-semibold mb-1">{t('technician')}</label>
+                    <input
+                        type="text"
+                        name="technician"
+                        value={newMaintenance.technician}
+                        onChange={onInputChange}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
+                        placeholder={t('enterTechnician')}
+                        required
+                    />
                 </div>
                 <div className="flex justify-between">
                     <button

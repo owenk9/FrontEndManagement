@@ -49,7 +49,7 @@ export default function EquipmentList() {
             if (!response.ok) throw new Error(t('fetchError'));
             const data = await response.json();
             setEquipmentData(data.content || []);
-            setTotalPages(data.totalPages || 1);
+            setTotalPages(data.page.totalPages || 1);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -65,7 +65,6 @@ export default function EquipmentList() {
             });
             if (!response.ok) throw new Error(t('fetchError'));
             const data = await response.json();
-            console.log('Fetched categories:', JSON.stringify(data, null, 2));
             setCategories(data.content || []);
         } catch (err) {
             console.error('Failed to fetch categories:', err);
@@ -80,14 +79,12 @@ export default function EquipmentList() {
             });
             if (!response.ok) throw new Error(t('fetchError'));
             const data = await response.json();
-            console.log('Fetched locations:', JSON.stringify(data, null, 2));
             setLocations(data.content || []);
         } catch (err) {
             console.error('Failed to fetch locations:', err);
         }
     };
 
-    // Xử lý tìm kiếm thời gian thực
     const handleSearch = (term) => {
         fetchEquipmentData(currentPage, term);
     };
@@ -122,10 +119,10 @@ export default function EquipmentList() {
             formData.append('equipment', equipmentBlob);
             if (newEquipmentData.image) formData.append('image', newEquipmentData.image);
 
-            console.log('FormData được gửi khi thêm:');
-            for (let pair of formData.entries()) {
-                console.log(pair[0] + ': ' + pair[1]);
-            }
+            // console.log('FormData được gửi khi thêm:');
+            // for (let pair of formData.entries()) {
+            //     console.log(pair[0] + ': ' + pair[1]);
+            // }
 
             const response = await fetch(`${BASE_URL}/equipment/add`, {
                 method: 'POST',
@@ -134,8 +131,8 @@ export default function EquipmentList() {
 
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error('Add failed with status:', response.status, 'Response:', errorText);
-                throw new Error(t('addError'));
+                // console.error('Add failed with status:', response.status, 'Response:', errorText);
+                throw new Error(t('addError') + errorText);
             }
 
             setNewEquipmentData({
@@ -175,10 +172,10 @@ export default function EquipmentList() {
             formData.append('equipment', equipmentBlob);
             if (selectedEquipment.image instanceof File) formData.append('image', selectedEquipment.image);
 
-            console.log('FormData được gửi:');
-            for (let pair of formData.entries()) {
-                console.log(pair[0] + ': ' + pair[1]);
-            }
+            // console.log('FormData được gửi:');
+            // for (let pair of formData.entries()) {
+            //     console.log(pair[0] + ': ' + pair[1]);
+            // }
 
             const response = await fetch(`${BASE_URL}/equipment/update/${selectedEquipment.id}`, {
                 method: 'PATCH',

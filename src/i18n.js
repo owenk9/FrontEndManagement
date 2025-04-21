@@ -78,7 +78,9 @@ i18n
                     maintenanceDate: 'Maintenance Date',
                     cost: 'Cost',
                     technician: 'Technician',
-
+                    enterCost: 'Enter cost',
+                    selectEquipment: 'Select equipment',
+                    enterTechnician: 'Enter technician',
                     //  Location
                     locations: 'Locations',
                     locationName: 'Location Name',
@@ -113,6 +115,13 @@ i18n
 
                     // DeleteLocationModal
                     areYouSureDeleteLocation: 'Are you sure you want to delete this location',
+
+                    // Maintenance
+                    statusPending: 'Pending',
+                    statusInProgress: 'In Progress',
+                    statusWaitingForParts: 'Waiting for Parts',
+                    statusCompleted: 'Completed',
+                    statusCanceled: 'Canceled',
 
                     // EditMaintenanceModal
                     editMaintenance: 'Edit Maintenance',
@@ -270,6 +279,15 @@ i18n
                     // DeleteLocationModal
                     areYouSureDeleteLocation: 'Bạn có chắc muốn xóa vị trí này',
 
+                    // Maintenance
+                    statusPending: 'Chờ xử lý',
+                    statusInProgress: 'Đang xử lý',
+                    statusWaitingForParts: 'Chờ linh kiện',
+                    statusCompleted: 'Hoàn tất',
+                    statusCanceled: 'Đã hủy',
+                    enterCost: 'Nhập giá',
+                    selectEquipment: 'Chọn thiết bị',
+                    enterTechnician: 'Nhập tên thợ máy',
                     // EditMaintenanceModal
                     editMaintenance: 'Chỉnh sửa bảo trì',
                     fillRequiredMaintenanceFields: 'Vui lòng điền đầy đủ các trường bắt buộc: Tên, Ngày bảo trì',

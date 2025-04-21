@@ -40,8 +40,7 @@ export default function Category() {
             if (!response.ok) throw new Error(t('fetchError'));
             const data = await response.json();
             setCategoryData(data.content || []);
-            setTotalPages(data.totalPages || 1);
-            // setCurrentPage(data.number || page);
+            setTotalPages(data.page.totalPages || 1);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -49,10 +48,8 @@ export default function Category() {
         }
     };
 
-    // Xử lý tìm kiếm thời gian thực
     const handleSearch = (term) => {
         fetchCategoryData(currentPage, term);
-        // setCurrentPage(0); // Reset về trang đầu khi tìm kiếm
     };
 
     useEffect(() => {
@@ -143,13 +140,13 @@ export default function Category() {
     };
 
     const handlePageChange = (page) => {
-        if (page >= 0 && page < totalPages) {
+        if (page >= 0 && page < totalPages  && page !== currentPage) {
             setLoading(true);
             setCurrentPage(page);
         }
     };
 
-    // Tạo danh sách số trang
+
     const renderPageNumbers = () => {
         const pageNumbers = [];
         const maxPagesToShow = 5;
