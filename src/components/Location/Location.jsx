@@ -1,108 +1,109 @@
-import { useState } from 'react';
+import {useState, useEffect, Fragment} from 'react';
 import SearchBar from '../Nav/SearchBar.jsx';
 import { Pencil, Trash2, Plus, ChevronDown, ChevronUp } from 'lucide-react';
-import AddEquipmentToLocation from './AddEquipmentLocation.jsx';
 import AddLocation from './AddLocation.jsx';
-import EditLocation from './EditLocation.jsx'; // Import modal chỉnh sửa
-import DeleteLocation from './DeleteLocation.jsx'; // Import modal xóa
+import EditLocation from './EditLocation.jsx';
+import DeleteLocation from './DeleteLocation.jsx';
 import { useTranslation } from 'react-i18next';
 
 export default function Location() {
     const { t } = useTranslation();
 
-    const [locationData, setLocationData] = useState([
-        {
-            id: 1,
-            locationName: 'Room 101',
-            equipment: [
-                { id: 1, name: 'Projector', status: 'Hoạt động', description: 'HD projector' },
-                { id: 2, name: 'Laptop Dell', status: 'Bảo trì', description: 'Office laptop' },
-            ],
-        },
-        {
-            id: 2,
-            locationName: 'Lab A',
-            equipment: [
-                { id: 3, name: 'LCD Monitor', status: 'Hoạt động', description: '24-inch monitor' },
-            ],
-        },
-        {
-            id: 3,
-            locationName: 'Warehouse B',
-            equipment: [],
-        },
-    ]);
-
-    const [isAddEquipmentModalOpen, setIsAddEquipmentModalOpen] = useState(false);
+    const [locationData, setLocationData] = useState([]);
+    const [equipmentData, setEquipmentData] = useState([]);
     const [isAddLocationModalOpen, setIsAddLocationModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [selectedLocationId, setSelectedLocationId] = useState(null);
     const [selectedLocation, setSelectedLocation] = useState(null);
     const [locationToDelete, setLocationToDelete] = useState(null);
-    const [newEquipmentData, setNewEquipmentData] = useState({
-        id: '',
-        name: '',
-        status: 'Hoạt động',
-        description: '',
-    });
     const [newLocationData, setNewLocationData] = useState({
-        id: '',
         locationName: '',
-        equipment: [],
+        equipments: '',
     });
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [currentPage, setCurrentPage] = useState(0);
+    const [totalPages, setTotalPages] = useState(1);
+    const [pageSize] = useState(10);
+    const [searchTerm, setSearchTerm] = useState('');
     const [expandedRows, setExpandedRows] = useState({});
 
-    function getStatusColor(status) {
-        switch (status) {
-            case 'Hỏng':
-                return 'bg-red-100 text-red-700 border-red-200';
-            case 'Hoạt động':
-                return 'bg-green-100 text-green-700 border-green-200';
-            case 'Bảo trì':
-                return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-            default:
-                return 'bg-gray-100 text-gray-700 border-gray-200';
-        }
-    }
+    const BASE_URL = 'http://localhost:9090';
 
-    const handleOpenAddEquipmentModal = (locationId) => {
-        setSelectedLocationId(locationId);
-        setIsAddEquipmentModalOpen(true);
+    const fetchLocationData = async (page = 0, search = '') => {
+        try {
+            const url = search
+                ? `${BASE_URL}/location/get?name=${encodeURIComponent(search)}&page=${page}&size=${pageSize}`
+                : `${BASE_URL}/location/get?page=${page}&size=${pageSize}`;
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            if (!response.ok) throw new Error(t('fetchError'));
+            const data = await response.json();
+            setLocationData(data.content || []);
+            setTotalPages(data.page.totalPages || 1);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleAddEquipment = () => {
-        if (!newEquipmentData.id || !newEquipmentData.name) {
-            alert(t('fillRequiredEquipmentFields'));
-            return;
+    const fetchEquipmentData = async () => {
+        try {
+            const response = await fetch(`${BASE_URL}/equipment/get?page=0&size=1000`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            if (!response.ok) throw new Error(t('fetchError'));
+            const data = await response.json();
+            setEquipmentData(data.content || []);
+        } catch (err) {
+            console.error('Failed to fetch equipment:', err);
         }
-        const updatedLocations = locationData.map((location) => {
-            if (location.id === selectedLocationId) {
-                return {
-                    ...location,
-                    equipment: [...location.equipment, { ...newEquipmentData, id: parseInt(newEquipmentData.id) }],
-                };
-            }
-            return location;
-        });
-        setLocationData(updatedLocations);
-        setNewEquipmentData({ id: '', name: '', status: 'Hoạt động', description: '' });
-        setIsAddEquipmentModalOpen(false);
-        setSelectedLocationId(null);
     };
 
+    const handleSearch = (term) => {
+        fetchLocationData(currentPage, term);
+    };
+
+    useEffect(() => {
+        setLoading(true);
+       fetchLocationData(currentPage, searchTerm);
+    }, [currentPage, searchTerm]);
+
+    useEffect(() => {
+        fetchEquipmentData();
+        console.log("Equipment data-----------------------:", equipmentData);
+    }, [])
     const handleOpenAddLocationModal = () => {
         setIsAddLocationModalOpen(true);
     };
 
-    const handleAddLocation = () => {
-        if (!newLocationData.id || !newLocationData.locationName) {
+    const handleAddLocation = async () => {
+        if (!newLocationData.locationName) {
             alert(t('fillRequiredLocationFields'));
             return;
         }
-        setLocationData([...locationData, { ...newLocationData, id: parseInt(newLocationData.id), equipment: [] }]);
-        setNewLocationData({ id: '', locationName: '', equipment: [] });
-        setIsAddLocationModalOpen(false);
+        try {
+            const response = await fetch(`${BASE_URL}/location/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    locationName: newLocationData.locationName,
+                }),
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(t('addError') + ': ' + errorText);
+            }
+            setNewLocationData({ locationName: '' });
+            setIsAddLocationModalOpen(false);
+            fetchLocationData(currentPage, searchTerm);
+        } catch (err) {
+            alert(err.message);
+        }
     };
 
     const handleOpenEditModal = (location) => {
@@ -110,17 +111,29 @@ export default function Location() {
         setIsEditModalOpen(true);
     };
 
-    const handleEditLocation = () => {
+    const handleEditLocation = async () => {
         if (!selectedLocation.locationName) {
             alert(t('fillRequiredLocationFields'));
             return;
         }
-        const updatedLocations = locationData.map((item) =>
-            item.id === selectedLocation.id ? { ...selectedLocation } : item
-        );
-        setLocationData(updatedLocations);
-        setIsEditModalOpen(false);
-        setSelectedLocation(null);
+        try {
+            const response = await fetch(`${BASE_URL}/location/update/${selectedLocation.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    locationName: selectedLocation.locationName,
+                }),
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(t('updateError') + ': ' + errorText);
+            }
+            setIsEditModalOpen(false);
+            setSelectedLocation(null);
+            fetchLocationData(currentPage, searchTerm);
+        } catch (err) {
+            alert(err.message);
+        }
     };
 
     const handleOpenDeleteModal = (location) => {
@@ -128,15 +141,22 @@ export default function Location() {
         setIsDeleteModalOpen(true);
     };
 
-    const handleDeleteLocation = () => {
-        setLocationData(locationData.filter((item) => item.id !== locationToDelete.id));
-        setIsDeleteModalOpen(false);
-        setLocationToDelete(null);
-    };
-
-    const handleEquipmentInputChange = (e) => {
-        const { name, value } = e.target;
-        setNewEquipmentData((prev) => ({ ...prev, [name]: value }));
+    const handleDeleteLocation = async () => {
+        try {
+            const response = await fetch(`${BASE_URL}/location/delete/${locationToDelete.id}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(t('deleteError') + ': ' + errorText);
+            }
+            setIsDeleteModalOpen(false);
+            setLocationToDelete(null);
+            fetchLocationData(currentPage, searchTerm);
+        } catch (err) {
+            alert(err.message);
+        }
     };
 
     const handleLocationInputChange = (e) => {
@@ -156,13 +176,87 @@ export default function Location() {
         }));
     };
 
+    function getStatusColor(status) {
+        switch (status) {
+            case 'Broken':
+                return 'bg-red-100 text-red-700 border-red-200';
+            case 'Active':
+                return 'bg-green-100 text-green-700 border-green-200';
+            case 'Maintenance':
+                return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+            default:
+                return 'bg-gray-100 text-gray-700 border-gray-200';
+        }
+    }
+
+    const getTranslatedStatus = (status) => {
+        switch (status) {
+            case 'Active':
+                return t('statusActive');
+            case 'Broken':
+                return t('statusBroken');
+            case 'Maintenance':
+                return t('statusMaintenance');
+            default:
+                return status;
+        }
+    };
+
+    const handlePageChange = (page) => {
+        if (page >= 0 && page < totalPages && page !== currentPage) {
+            setLoading(true);
+            setCurrentPage(page);
+        }
+    };
+
+    const renderPageNumbers = () => {
+        const pageNumbers = [];
+        const maxPagesToShow = 5;
+        let startPage = Math.max(0, currentPage - Math.floor(maxPagesToShow / 2));
+        let endPage = Math.min(totalPages - 1, startPage + maxPagesToShow - 1);
+
+        if (endPage - startPage + 1 < maxPagesToShow) {
+            startPage = Math.max(0, endPage - maxPagesToShow + 1);
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            pageNumbers.push(
+                <button
+                    key={i}
+                    onClick={() => handlePageChange(i)}
+                    className={`px-3 py-1 rounded-md ${
+                        currentPage === i
+                            ? 'bg-black text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                >
+                    {i + 1}
+                </button>
+            );
+        }
+
+        return pageNumbers;
+    };
+
+    const getEquipmentForLocation = (location) => {
+        let equipment;
+        if (location.equipment && Array.isArray(location.equipment)) {
+            equipment = location.equipment;
+        } else {
+            equipment = equipmentData.filter((equip) => equip.locationId === location.id);
+        }
+        return equipment.sort((a, b) => a.id - b.id);
+    };
+    if (loading) return <div className="min-h-screen p-6 min-w-full flex items-center justify-center"><p>{t('loading')}</p></div>;
+    if (error) return <div className="min-h-screen p-6 min-w-full flex items-center justify-center"><p className="text-red-600">{t('error')}: {error}</p></div>;
+
     return (
         <div className="min-h-screen p-6 min-w-full overflow-auto">
             <div className="mb-6">
                 <h1 className="text-3xl font-bold text-gray-900">{t('locations')}</h1>
             </div>
             <div className="mb-6 flex justify-between items-center">
-                <SearchBar />
+                <SearchBar onSearch={handleSearch} />
                 <button
                     className="flex items-center gap-2 bg-black text-white py-2 px-4 rounded-md hover:bg-gray-700 transition duration-200"
                     onClick={handleOpenAddLocationModal}
@@ -172,109 +266,111 @@ export default function Location() {
                 </button>
             </div>
             <div className="bg-white shadow-md rounded-lg mb-4">
-                <table className="min-w-full">
+                <table className="min-w-full table-fixed">
                     <thead className="bg-gray-200 text-gray-700">
-                    <tr>
-                        <th className="py-4 px-6 text-left font-semibold">{t('id')}</th>
+                    <tr className="rounded-t-lg">
+                        <th className="py-4 px-6 text-left font-semibold w-[100px]">{t('id')}</th>
                         <th className="py-4 px-6 text-left font-semibold">{t('locationName')}</th>
-                        <th className="py-4 px-6 text-left font-semibold">{t('equipment')}</th>
-                        <th className="py-4 px-6 font-semibold">{t('actions')}</th>
+                        <th className="py-4 px-6 text-left font-semibold w-[150px]">{t('equipment')}</th>
+                        <th className="py-4 px-6 font-semibold w-[150px]">{t('actions')}</th>
                     </tr>
                     </thead>
                     <tbody>
-                    {locationData.map((location) => (
-                        <>
-                            <tr key={location.id} className="border-t border-gray-200 hover:bg-gray-50">
-                                <td className="py-4 px-6 text-gray-800">{location.id}</td>
-                                <td className="py-4 px-6 text-gray-800">{location.locationName}</td>
-                                <td className="py-4 px-6 text-gray-800">
-                                    <button
-                                        onClick={() => toggleRowExpansion(location.id)}
-                                        className="flex items-center gap-2 text-blue-700 hover:underline"
-                                    >
-                                        {location.equipment.length} {t('equipments')}
-                                        {expandedRows[location.id] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                    </button>
-                                </td>
-                                <td className="py-4 px-6 text-center">
-                                    <div className="flex justify-center gap-3">
+                    {locationData.map((location) => {
+                        const locationEquipment = getEquipmentForLocation(location);
+                        return (
+                            <Fragment key={location.id}>
+                                <tr className="border-t border-gray-200 hover:bg-gray-50">
+                                    <td className="py-4 px-6 text-gray-800 w-[100px]">{location.id}</td>
+                                    <td className="py-4 px-6 text-gray-800">{location.locationName}</td>
+                                    <td className="py-4 px-6 text-gray-800 w-[150px]">
                                         <button
-                                            onClick={() => handleOpenAddEquipmentModal(location.id)}
-                                            className="flex items-center gap-2 px-2 py-1 text-green-700 font-bold rounded-md hover:bg-green-600 hover:text-white transition duration-200"
+                                            onClick={() => toggleRowExpansion(location.id)}
+                                            className="flex items-center gap-2 text-blue-700 hover:underline"
                                         >
-                                            <Plus size={16} />
-                                            {t('addEquipment')}
+                                            {locationEquipment.length} {t('equipments')}
+                                            {expandedRows[location.id] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                                         </button>
-                                        <button
-                                            onClick={() => handleOpenEditModal(location)}
-                                            className="p-2 text-blue-700 font-bold rounded-md hover:bg-blue-600 hover:text-white transition duration-200 cursor-pointer"
-                                        >
-                                            <Pencil size={16} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleOpenDeleteModal(location)}
-                                            className="px-2 py-1 text-red-700 font-bold rounded-md hover:bg-red-500 hover:text-white transition duration-200 cursor-pointer"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            {expandedRows[location.id] && location.equipment.length > 0 && (
-                                <tr className="bg-gray-50">
-                                    <td colSpan="4" className="py-2 px-6">
-                                        <table className="w-full">
-                                            <thead>
-                                            <tr className="text-gray-600">
-                                                <th className="py-2 px-4 text-left">{t('id')}</th>
-                                                <th className="py-2 px-4 text-left">{t('equipmentName')}</th>
-                                                <th className="py-2 px-4 text-left">{t('status')}</th>
-                                                <th className="py-2 px-4 text-left">{t('description')}</th>
-                                            </tr>
-                                            </thead>
-                                            <tbody>
-                                            {location.equipment.map((equip) => (
-                                                <tr key={equip.id} className="border-t border-gray-200">
-                                                    <td className="py-2 px-4">{equip.id}</td>
-                                                    <td className="py-2 px-4">{equip.name}</td>
-                                                    <td className="py-2 px-4">
-                                <span
-                                    className={`inline-block px-3 py-1 text-sm font-medium rounded-full border ${getStatusColor(equip.status)}`}
-                                >
-                                  {t(
-                                      equip.status === 'Hoạt động'
-                                          ? 'statusActive'
-                                          : equip.status === 'Bảo trì'
-                                              ? 'statusMaintenance'
-                                              : 'statusBroken'
-                                  )}
-                                </span>
-                                                    </td>
-                                                    <td className="py-2 px-4">{equip.description}</td>
-                                                </tr>
-                                            ))}
-                                            </tbody>
-                                        </table>
+                                    </td>
+                                    <td className="py-4 px-6 text-center w-[150px]">
+                                        <div className="flex justify-center gap-3">
+                                            <button
+                                                onClick={() => handleOpenEditModal(location)}
+                                                className="p-2 text-blue-700 font-bold rounded-md hover:bg-blue-600 hover:text-white transition duration-200 cursor-pointer"
+                                            >
+                                                <Pencil size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleOpenDeleteModal(location)}
+                                                className="px-2 py-1 text-red-700 font-bold rounded-md hover:bg-red-500 hover:text-white transition duration-200 cursor-pointer"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
-                            )}
-                        </>
-                    ))}
+                                {expandedRows[location.id] && locationEquipment.length > 0 && (
+                                    <tr className="bg-gray-50">
+                                        <td colSpan="4" className="py-2 px-6">
+                                            <table className="w-full table-fixed">
+                                                <thead>
+                                                <tr className="text-gray-600">
+                                                    <th className="py-2 px-4 text-left w-[100px]">{t('id')}</th>
+                                                    <th className="py-2 px-4 text-left">{t('equipmentName')}</th>
+                                                    <th className="py-2 px-4 text-left w-[150px]">{t('status')}</th>
+                                                    <th className="py-2 px-4 text-left">{t('description')}</th>
+                                                </tr>
+                                                </thead>
+                                                <tbody>
+                                                {locationEquipment.map((equip) => (
+                                                    <tr key={equip.id} className="border-t border-gray-200">
+                                                        <td className="py-2 px-4 w-[100px]">{equip.id}</td>
+                                                        <td className="py-2 px-4">{equip.name}</td>
+                                                        <td className="py-2 px-4 w-[150px]">
+                        <span
+                            className={`inline-block px-3 py-1 text-sm font-medium rounded-full border ${getStatusColor(equip.status)}`}
+                        >
+                          {getTranslatedStatus(equip.status)}
+                        </span>
+                                                        </td>
+                                                        <td className="py-2 px-4">{equip.description || 'N/A'}</td>
+                                                    </tr>
+                                                ))}
+                                                </tbody>
+                                            </table>
+                                        </td>
+                                    </tr>
+                                )}
+                            </Fragment>
+                        );
+                    })}
                     </tbody>
                 </table>
+                <div className="flex justify-end items-center p-4">
+                    <div className="flex gap-2">
+                        <button
+                            className={`px-3 py-1 rounded-md ${
+                                currentPage === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-700'
+                            }`}
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 0}
+                        >
+                            {t('previous')}
+                        </button>
+                        {renderPageNumbers()}
+                        <button
+                            className={`px-3 py-1 rounded-md ${
+                                currentPage === totalPages - 1 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-700'
+                            }`}
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages - 1}
+                        >
+                            {t('next')}
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            {/* Modal thêm thiết bị vào địa điểm */}
-            <AddEquipmentToLocation
-                isOpen={isAddEquipmentModalOpen}
-                onClose={() => setIsAddEquipmentModalOpen(false)}
-                onSave={handleAddEquipment}
-                newEquipment={newEquipmentData}
-                onInputChange={handleEquipmentInputChange}
-                locationName={locationData.find((loc) => loc.id === selectedLocationId)?.locationName || ''}
-            />
-
-            {/* Modal thêm địa điểm */}
             <AddLocation
                 isOpen={isAddLocationModalOpen}
                 onClose={() => setIsAddLocationModalOpen(false)}
@@ -283,7 +379,6 @@ export default function Location() {
                 onInputChange={handleLocationInputChange}
             />
 
-            {/* Modal chỉnh sửa địa điểm */}
             <EditLocation
                 isOpen={isEditModalOpen}
                 onClose={() => setIsEditModalOpen(false)}
@@ -292,7 +387,6 @@ export default function Location() {
                 onInputChange={handleEditInputChange}
             />
 
-            {/* Modal xóa địa điểm */}
             <DeleteLocation
                 isOpen={isDeleteModalOpen}
                 onClose={() => setIsDeleteModalOpen(false)}

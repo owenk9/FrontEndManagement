@@ -8,12 +8,12 @@ import { useTranslation } from 'react-i18next';
 export default function Borrowing() {
     const { t } = useTranslation();
 
-    const [borrowingData, setBorrowingData] = useState([
-        { id: 1, equipmentName: 'Projector', userName: 'Nguyen Van A', borrowDate: '2023-10-01T09:00', returnDate: '2023-10-05T17:00', status: 'Returned' },
-        { id: 2, equipmentName: 'Laptop Dell', userName: 'Tran Thi B', borrowDate: '2023-11-15T14:30', returnDate: null, status: 'Borrowing' },
-        { id: 3, equipmentName: 'Bluetooth Speaker', userName: 'Le Van C', borrowDate: '2023-12-10T10:15', returnDate: '2023-12-12T16:45', status: 'Returned' },
-    ]);
-
+    // const [borrowingData, setBorrowingData] = useState([
+    //     { id: 1, equipmentName: 'Projector', userName: 'Nguyen Van A', borrowDate: '2023-10-01T09:00', returnDate: '2023-10-05T17:00', status: 'Returned' },
+    //     { id: 2, equipmentName: 'Laptop Dell', userName: 'Tran Thi B', borrowDate: '2023-11-15T14:30', returnDate: null, status: 'Borrowing' },
+    //     { id: 3, equipmentName: 'Bluetooth Speaker', userName: 'Le Van C', borrowDate: '2023-12-10T10:15', returnDate: '2023-12-12T16:45', status: 'Returned' },
+    // ]);
+    const [borrowingData, setBorrowingData] = useState([]);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [selectedBorrowing, setSelectedBorrowing] = useState(null);
