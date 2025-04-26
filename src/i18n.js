@@ -166,6 +166,13 @@ i18n
 
                     // Search bar
                     searchByEquipmentName: 'Search by name',
+
+                    // Login
+                    login: 'Login',
+                    password: 'Password',
+                    rememberMe: 'Remember me',
+                    forgotPassword: 'Forgot your password',
+                    invalidCredentials: 'Invalid Credentials',
                 },
             },
             vi: {
@@ -331,6 +338,13 @@ i18n
 
                     // Search bar
                     searchByEquipmentName: 'Tìm kiếm theo tên ',
+
+                    // Login
+                    login: 'Đăng nhập',
+                    password: 'Mật khẩu',
+                    rememberMe: 'Nhớ đăng nhập',
+                    forgotPassword: 'Quên mật khẩu',
+                    invalidCredentials: 'Tài khoản hoặc mật khẩu không hợp lệ',
                 },
             },
         },

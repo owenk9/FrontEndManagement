@@ -1,81 +1,82 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { BarChart2, AlertCircle, Clock } from 'lucide-react'; // Icon từ lucide-react
 
 export default function Home() {
     const { t } = useTranslation();
+    const navigate = useNavigate();
+    const BASE_URL = 'http://localhost:9090';
 
-    // Dữ liệu mẫu (có thể thay bằng dữ liệu thực từ API)
-    const [user] = useState({ fullName: 'Nguyen Van A' }); // Giả định người dùng đăng nhập
-    const [stats] = useState({
-        totalEquipments: 50,
-        borrowingCount: 12,
-        maintenanceCount: 5,
-    });
-    const [notifications] = useState([
-        { id: 1, message: 'Laptop Dell - Return due today', type: 'warning', time: '2025-03-24 14:00' },
-        { id: 2, message: 'Projector - Maintenance scheduled tomorrow', type: 'info', time: '2025-03-25 09:00' },
-    ]);
+    const [user, setUser] = useState({ fullName: '' });
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    // Fetch dữ liệu người dùng
+    const fetchUser = useCallback(async () => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            setError(t('noToken'));
+            setLoading(false);
+            navigate('/login');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${BASE_URL}/user/me`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+            if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                    localStorage.removeItem('token');
+                    navigate('/login');
+                    throw new Error(t('unauthorized'));
+                }
+                throw new Error(t('fetchError'));
+            }
+            const data = await response.json();
+            setUser(data);
+            setError(null);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    }, [t, navigate]);
+
+    useEffect(() => {
+        fetchUser();
+    }, [fetchUser]);
+
+    // Hiển thị loading
+    if (loading) {
+        return (
+            <div className="min-h-screen p-6 ml-64 flex items-center justify-center">
+                <p>{t('loading')}</p>
+            </div>
+        );
+    }
+
+    // Hiển thị lỗi
+    if (error) {
+        return (
+            <div className="min-h-screen p-6 ml-64 flex items-center justify-center">
+                <p className="text-red-600">{t('error')}: {error}</p>
+            </div>
+        );
+    }
 
     return (
-        <div className="min-h-screen p-6 ml-64"> {/* ml-64 để tránh đè NavBar */}
+        <div className="min-h-screen p-6 ml-64">
             {/* Chào mừng */}
             <div className="mb-8">
                 <h1 className="text-3xl font-bold text-gray-900">
-                    {t('welcome')}, {user.fullName}!
+                    {t('welcome')}, {user.fullName || t('user')}!
                 </h1>
                 <p className="text-gray-600 mt-2">{t('homeDescription')}</p>
-            </div>
-
-            {/* Tổng quan nhanh */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
-                    <div>
-                        <h2 className="text-lg font-semibold text-gray-700">{t('totalEquipments')}</h2>
-                        <p className="text-3xl font-bold text-gray-900">{stats.totalEquipments}</p>
-                    </div>
-                    <BarChart2 className="text-blue-600" size={32} />
-                </div>
-                <div className="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
-                    <div>
-                        <h2 className="text-lg font-semibold text-gray-700">{t('borrowingCount')}</h2>
-                        <p className="text-3xl font-bold text-gray-900">{stats.borrowingCount}</p>
-                    </div>
-                    <BarChart2 className="text-green-600" size={32} />
-                </div>
-                <div className="bg-white p-6 rounded-lg shadow-md flex items-center justify-between">
-                    <div>
-                        <h2 className="text-lg font-semibold text-gray-700">{t('maintenanceCount')}</h2>
-                        <p className="text-3xl font-bold text-gray-900">{stats.maintenanceCount}</p>
-                    </div>
-                    <BarChart2 className="text-yellow-600" size={32} />
-                </div>
-            </div>
-
-            {/* Thông báo gần đây */}
-            <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('recentNotifications')}</h2>
-                {notifications.length > 0 ? (
-                    <ul className="space-y-4">
-                        {notifications.map((notification) => (
-                            <li key={notification.id} className="flex items-start space-x-3">
-                                <AlertCircle
-                                    className={notification.type === 'warning' ? 'text-red-500' : 'text-blue-500'}
-                                    size={20}
-                                />
-                                <div>
-                                    <p className="text-gray-800">{notification.message}</p>
-                                    <p className="text-sm text-gray-500 flex items-center">
-                                        <Clock size={14} className="mr-1" /> {notification.time}
-                                    </p>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                ) : (
-                    <p className="text-gray-600">{t('noNotifications')}</p>
-                )}
             </div>
 
             {/* Liên kết nhanh */}

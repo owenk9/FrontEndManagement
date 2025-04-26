@@ -15,20 +15,18 @@ import { useTranslation } from 'react-i18next';
 export default function NavBar() {
     const { t } = useTranslation();
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false); // State cho dropdown
+    const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
     const navigate = useNavigate();
 
-    // Dữ liệu mẫu người dùng (có thể thay bằng dữ liệu thực từ API hoặc state toàn cục)
     const currentUser = {
         fullName: 'Nguyen Van A',
         email: 'nguyenvana@example.com',
         role: 'User',
     };
-
     const handleLogout = () => {
-        // Logic đăng xuất: xóa token, reset state, chuyển về trang đăng nhập
-        localStorage.removeItem('token'); // Ví dụ: xóa token
-        navigate('/login'); // Điều hướng về trang đăng nhập
+
+        localStorage.removeItem('token');
+        navigate('/login');
     };
 
     return (
