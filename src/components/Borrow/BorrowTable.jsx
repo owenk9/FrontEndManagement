@@ -1,0 +1,405 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { CheckCircle, XCircle, Loader2, PlusCircle, Calendar } from 'lucide-react';
+import 'react-loading-skeleton/dist/skeleton.css';
+import debounce from 'lodash.debounce';
+
+export default function BorrowTable({ searchQuery, filterParams, setCategories, setLocations }) {
+    const { t } = useTranslation();
+    const [equipments, setEquipments] = useState([]);
+    const [selectedEquipment, setSelectedEquipment] = useState(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isBookingLater, setIsBookingLater] = useState(false);
+    const [borrowDetails, setBorrowDetails] = useState({
+        borrowDate: new Date().toISOString().split('T')[0],
+        note: '',
+    });
+    const [submitting, setSubmitting] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [currentPage, setCurrentPage] = useState(0);
+    const [totalPages, setTotalPages] = useState(1);
+    const [pageSize] = useState(10);
+
+    const BASE_URL = 'http://localhost:9090';
+
+    const fetchEquipmentData = useCallback(async (page = 0) => {
+        try {
+            setLoading(true);
+            let url = `${BASE_URL}/equipment/get?page=${page}&size=${pageSize}`;
+            if (searchQuery) url += `&name=${encodeURIComponent(searchQuery)}`;
+            if (filterParams.filterDate) url += `&returnDate=${filterParams.filterDate}`;
+            if (filterParams.filterCategory) url += `&categoryId=${filterParams.filterCategory}`;
+            if (filterParams.filterLocation) url += `&locationId=${filterParams.filterLocation}`;
+            if (filterParams.filterStatus) url += `&status=${filterParams.filterStatus}`;
+
+            console.log('Fetching URL:', url);
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`${t('fetchError')}: ${errorText}`);
+            }
+            const data = await response.json();
+            setEquipments(data.content || []);
+            setTotalPages(data.totalPages || 1);
+        } catch (err) {
+            console.error('Fetch equipment error:', err);
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    }, [searchQuery, filterParams, pageSize, t]);
+
+    // Debounced fetchEquipmentData
+    const debouncedFetchEquipmentData = useCallback(
+        debounce((page) => {
+            console.log('Debounced fetch triggered for page:', page);
+            fetchEquipmentData(page);
+        }, 200),
+        [fetchEquipmentData]
+    );
+
+    // Consolidated useEffect for searchQuery, filterParams, and initial load
+    useEffect(() => {
+        setLoading(true);
+        setCurrentPage(0); // Reset to page 0 on search/filter change
+        debouncedFetchEquipmentData(0);
+        return () => debouncedFetchEquipmentData.cancel();
+    }, [searchQuery, filterParams, debouncedFetchEquipmentData]);
+
+    // Handle page changes
+    useEffect(() => {
+        if (currentPage !== 0) {
+            debouncedFetchEquipmentData(currentPage);
+        }
+        return () => debouncedFetchEquipmentData.cancel();
+    }, [currentPage, debouncedFetchEquipmentData]);
+
+    // Initial fetch for categories and locations
+    useEffect(() => {
+        const fetchInitialData = async () => {
+            try {
+                const [categoriesRes, locationsRes] = await Promise.all([
+                    fetch(`${BASE_URL}/category/get?page=0&size=10`, {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' },
+                    }),
+                    fetch(`${BASE_URL}/location/get?page=0&size=10`, {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' },
+                    }),
+                ]);
+
+                if (!categoriesRes.ok) throw new Error(`${t('fetchError')}: Categories`);
+                if (!locationsRes.ok) throw new Error(`${t('fetchError')}: Locations`);
+
+                const [categoriesData, locationsData] = await Promise.all([
+                    categoriesRes.json(),
+                    locationsRes.json(),
+                ]);
+
+                setCategories(categoriesData.content || []);
+                setLocations(locationsData.content || []);
+            } catch (err) {
+                console.error('Fetch initial data error:', err);
+                setError(err.message);
+            }
+        };
+
+        fetchInitialData();
+    }, [t]);
+
+    const openBorrowModal = (equipment, bookLater = false) => {
+        setSelectedEquipment(equipment);
+        setIsBookingLater(bookLater);
+        setBorrowDetails({
+            borrowDate: bookLater && equipment.returnDate ? equipment.returnDate : new Date().toISOString().split('T')[0],
+            note: '',
+        });
+        setIsModalOpen(true);
+    };
+
+    const handleBorrowRequest = async () => {
+        setSubmitting(true);
+        try {
+            const borrowData = {
+                equipmentId: selectedEquipment.id,
+                borrowDate: borrowDetails.borrowDate,
+                note: borrowDetails.note,
+                isBookingLater: isBookingLater,
+            };
+            const response = await fetch(`${BASE_URL}/borrow/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(borrowData),
+            });
+            if (!response.ok) throw new Error(t(isBookingLater ? 'bookLaterError' : 'borrowError'));
+            setIsModalOpen(false);
+            alert(
+                isBookingLater
+                    ? t('bookLaterSuccess', { name: selectedEquipment.name })
+                    : t('borrowSuccess', { name: selectedEquipment.name })
+            );
+            fetchEquipmentData(currentPage); // Immediate fetch
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const isBorrowDateValid = () => {
+        if (!isBookingLater) return true;
+        const minBorrowDate = selectedEquipment?.returnDate || new Date().toISOString().split('T')[0];
+        return borrowDetails.borrowDate >= minBorrowDate;
+    };
+
+    function getStatusColor(status) {
+        switch (status) {
+            case 'Broken':
+                return 'bg-red-100 text-red-700 border-red-200';
+            case 'Active':
+                return 'bg-green-100 text-green-700 border-green-200';
+            case 'Maintenance':
+                return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+            case 'Borrowed':
+                return 'bg-blue-100 text-blue-700 border-blue-200';
+            default:
+                return 'bg-gray-100 text-gray-700 border-gray-200';
+        }
+    }
+
+    const getTranslatedStatus = (status) => {
+        switch (status) {
+            case 'Active':
+                return t('statusActive');
+            case 'Broken':
+                return t('statusBroken');
+            case 'Maintenance':
+                return t('statusMaintenance');
+            case 'Borrowed':
+                return t('statusBorrowed');
+            default:
+                return status;
+        }
+    };
+
+    const handlePageChange = (page) => {
+        if (page >= 0 && page < totalPages && page !== currentPage) {
+            setLoading(true);
+            setCurrentPage(page);
+        }
+    };
+
+    const renderPageNumbers = () => {
+        const pageNumbers = [];
+        const maxPagesToShow = 5;
+        let startPage = Math.max(0, currentPage - Math.floor(maxPagesToShow / 2));
+        let endPage = Math.min(totalPages - 1, startPage + maxPagesToShow - 1);
+
+        if (endPage - startPage + 1 < maxPagesToShow) {
+            startPage = Math.max(0, endPage - maxPagesToShow + 1);
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            pageNumbers.push(
+                <button
+                    key={i}
+                    onClick={() => handlePageChange(i)}
+                    className={`px-3 py-1 rounded-md ${
+                        currentPage === i
+                            ? 'bg-black text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                >
+                    {i + 1}
+                </button>
+            );
+        }
+        return pageNumbers;
+    };
+
+    if (error) return (
+        <div className="min-h-screen p-6 flex items-center justify-center">
+            <p className="text-red-600">{t('error')}: {error}</p>
+            <button
+                onClick={() => fetchEquipmentData(0)}
+                className="ml-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+                {t('retry')}
+            </button>
+        </div>
+    );
+
+    return (
+        <div className="flex-1 bg-white p-6 rounded-lg shadow-md">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('equipments')}</h2>
+            {equipments.length > 0 || loading ? (
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                        <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('name')}</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('image')}</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('quantity')}</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('status')}</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('category')}</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('location')}</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('description')}</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('returnDate')}</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('actions')}</th>
+                        </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                        {
+                            equipments.map((equipment) => (
+                                <tr key={equipment.id}>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{equipment.name}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {equipment.imageUrl ? (
+                                            <img
+                                                src={equipment.imageUrl}
+                                                alt={equipment.name}
+                                                className="w-16 h-16 object-cover rounded"
+                                                onError={(e) => {
+                                                    console.error(`Failed to load image: ${equipment.imageUrl}`);
+                                                    e.target.src = '/fallback-image.png';
+                                                }}
+                                            />
+                                        ) : t('noImage')}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{equipment.quantity}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <span className={`inline-block px-3 py-1 text-sm font-medium rounded-full border ${getStatusColor(equipment.status)}`}>
+                                            {getTranslatedStatus(equipment.status)}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{equipment.categoryName || '-'}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{equipment.locationName || '-'}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-500">{equipment.description || '-'}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{equipment.returnDate || '-'}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm flex space-x-2">
+                                        {equipment.quantity > 0 && equipment.status === 'Active' ? (
+                                            <button
+                                                onClick={() => openBorrowModal(equipment, false)}
+                                                className="relative text-blue-600 hover:text-blue-800 group"
+                                            >
+                                                <PlusCircle size={20} />
+                                                <span className="absolute hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2 -top-8 left-1/2 transform -translate-x-1/2">
+                                                    {t('borrow')}
+                                                </span>
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => openBorrowModal(equipment, true)}
+                                                className="relative text-green-600 hover:text-green-800 group"
+                                                disabled={equipment.status !== 'Active' && equipment.status !== 'Borrowed'}
+                                            >
+                                                <Calendar size={20} />
+                                                <span className="absolute hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2 -top-8 left-1/2 transform -translate-x-1/2">
+                                                    {t('bookLater')}
+                                                </span>
+                                            </button>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))
+                        }
+                        </tbody>
+                    </table>
+                    <div className="flex justify-end items-center p-4">
+                        <div className="flex gap-2">
+                            <button
+                                className={`px-3 py-1 rounded-md ${
+                                    currentPage === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-700'
+                                }`}
+                                onClick={() => handlePageChange(currentPage - 1)}
+                                disabled={currentPage === 0 || loading}
+                            >
+                                {t('previous')}
+                            </button>
+                            {renderPageNumbers()}
+                            <button
+                                className={`px-3 py-1 rounded-md ${
+                                    currentPage === totalPages - 1 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-700'
+                                }`}
+                                onClick={() => handlePageChange(currentPage + 1)}
+                                disabled={currentPage === totalPages - 1 || loading}
+                            >
+                                {t('next')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <p className="text-gray-600 text-center">{t('noEquipments')}</p>
+            )}
+
+            {isModalOpen && (
+                <div className="fixed inset-0 bg-opacity-50 flex items-center justify-center z-50 bg-black/30">
+                    <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md pointer-events-auto">
+                        <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                            {isBookingLater ? t('bookLaterEquipment') : t('borrowEquipment')}
+                        </h2>
+                        <p className="text-gray-600 mb-4">
+                            {isBookingLater
+                                ? t('bookLaterConfirm', { name: selectedEquipment?.name })
+                                : t('borrowConfirm', { name: selectedEquipment?.name })}
+                        </p>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700">
+                                {isBookingLater ? t('bookingDate') : t('borrowDate')}
+                            </label>
+                            <input
+                                type="date"
+                                value={borrowDetails.borrowDate}
+                                onChange={(e) => setBorrowDetails({ ...borrowDetails, borrowDate: e.target.value })}
+                                min={isBookingLater ? selectedEquipment?.returnDate || new Date().toISOString().split('T')[0] : undefined}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                required
+                            />
+                            {isBookingLater && !isBorrowDateValid() && (
+                                <p className="text-red-600 text-sm mt-1">{t('invalidBookingDate')}</p>
+                            )}
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700">{t('note')}</label>
+                            <textarea
+                                value={borrowDetails.note}
+                                onChange={(e) => setBorrowDetails({ ...borrowDetails, note: e.target.value })}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                rows="4"
+                                placeholder={t('notePlaceholder')}
+                            />
+                        </div>
+                        <div className="flex justify-end space-x-4">
+                            <button
+                                onClick={handleBorrowRequest}
+                                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-400"
+                                disabled={submitting || (isBookingLater && !isBorrowDateValid())}
+                            >
+                                {submitting ? (
+                                    <Loader2 size={20} className="mr-2 animate-spin" />
+                                ) : (
+                                    <CheckCircle size={20} className="mr-2" />
+                                )}
+                                {t('confirm')}
+                            </button>
+                            <button
+                                onClick={() => setIsModalOpen(false)}
+                                className="flex items-center px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+                                disabled={submitting}
+                            >
+                                <XCircle size={20} className="mr-2" />
+                                {t('cancel')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}

@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom'; // Thêm useNavigate để xử lý đăng xuất
-import homepage from '../../assets/homepage3.png';
-import maintenance from '../../assets/maintenance.png';
-import category from '../../assets/category2.png';
-import borrowing from '../../assets/borrowing2.png';
-import equipment from '../../assets/equipment.png';
-import setting from '../../assets/setting.png';
-import users from '../../assets/user.png';
-import location from '../../assets/location.png';
+import homepage from '../../../assets/homepage3.png';
+import maintenance from '../../../assets/maintenance.png';
+import category from '../../../assets/category2.png';
+import borrowing from '../../../assets/borrowing2.png';
+import equipment from '../../../assets/equipment.png';
+import setting from '../../../assets/setting.png';
+import users from '../../../assets/user.png';
+import location from '../../../assets/location.png';
 import NavItem from './NavItem.jsx';
 import AuthModal from '../User/AuthModal.jsx';
 import { useTranslation } from 'react-i18next';

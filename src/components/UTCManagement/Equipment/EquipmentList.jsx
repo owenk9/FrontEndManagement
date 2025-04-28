@@ -219,6 +219,8 @@ export default function EquipmentList() {
                 return 'bg-green-100 text-green-700 border-green-200';
             case 'Maintenance':
                 return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+            case 'Borrowed':
+                return 'bg-blue-100 text-blue-700 border-blue-200';
             default:
                 return 'bg-gray-100 text-gray-700 border-gray-200';
         }
@@ -232,6 +234,8 @@ export default function EquipmentList() {
                 return t('statusBroken');
             case 'Maintenance':
                 return t('statusMaintenance');
+            case 'Borrowed':
+                return t('statusBorrowed');
             default:
                 return status;
         }
@@ -414,25 +418,6 @@ export default function EquipmentList() {
                     </div>
                 </div>
             </div>
-            {/*<div className="flex justify-between items-center mt-4">*/}
-            {/*    <button*/}
-            {/*        className={`px-4 py-2 rounded-md ${currentPage === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-700'}`}*/}
-            {/*        onClick={() => handlePageChange(currentPage - 1)}*/}
-            {/*        disabled={currentPage === 0}*/}
-            {/*    >*/}
-            {/*        {t('previous')}*/}
-            {/*    </button>*/}
-            {/*    <span className="text-gray-700">*/}
-            {/*        {t('page')} {currentPage + 1} / {totalPages}*/}
-            {/*    </span>*/}
-            {/*    <button*/}
-            {/*        className={`px-4 py-2 rounded-md ${currentPage === totalPages - 1 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-700'}`}*/}
-            {/*        onClick={() => handlePageChange(currentPage + 1)}*/}
-            {/*        disabled={currentPage === totalPages - 1}*/}
-            {/*    >*/}
-            {/*        {t('next')}*/}
-            {/*    </button>*/}
-            {/*</div>*/}
             <AddEquipment
                 isOpen={isAddModalOpen}
                 onClose={() => setIsAddModalOpen(false)}

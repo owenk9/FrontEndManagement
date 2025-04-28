@@ -160,8 +160,8 @@ i18n
 
 
                     // Pagination
-                    previous: 'Previous', // Thêm Previous
-                    next: 'Next', // Thêm Next
+                    previous: 'Previous',
+                    next: 'Next',
                     page: 'Page',
 
                     // Search bar
@@ -173,6 +173,17 @@ i18n
                     rememberMe: 'Remember me',
                     forgotPassword: 'Forgot your password',
                     invalidCredentials: 'Invalid Credentials',
+
+                    // Borrow
+                    borrow: 'Borrow',
+                    filters: 'Filters',
+                    filterDate: "Date",
+                    all: 'All',
+                    clearFilters: 'Clear filters',
+                    confirm: 'Confirm',
+                    statusBorrowed: 'Borrowed',
+                    borrowEquipment: 'Borrow equipment',
+                    borrowConfirm: 'Borrow confirm',
                 },
             },
             vi: {
@@ -345,6 +356,16 @@ i18n
                     rememberMe: 'Nhớ đăng nhập',
                     forgotPassword: 'Quên mật khẩu',
                     invalidCredentials: 'Tài khoản hoặc mật khẩu không hợp lệ',
+
+                    // Borrow
+                    borrow: '',
+                    filters: 'Bộ lọc',
+                    filterDate: 'Lọc theo ngày tháng',
+                    all: 'Tất cả',
+                    clearFilters: 'Xóa tất cả bộ lọc',
+                    confirm: 'Chấp nhận',
+                    statusBorrowed: 'Đang mượn',
+                    borrowEquipment: 'Mượn thiết bị',
                 },
             },
         },
