@@ -1,21 +1,25 @@
-import { useState, useEffect, useCallback } from 'react';
+import {useState, useEffect, useCallback, Fragment} from 'react';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle, XCircle, Loader2, PlusCircle, Calendar } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
 import 'react-loading-skeleton/dist/skeleton.css';
 import debounce from 'lodash.debounce';
 
 export default function BorrowTable({ searchQuery, filterParams, setCategories, setLocations }) {
     const { t } = useTranslation();
     const [equipments, setEquipments] = useState([]);
-    const [selectedEquipment, setSelectedEquipment] = useState(null);
+    const [equipmentItems, setEquipmentItems] = useState({}); // Lưu danh sách EquipmentItem theo equipmentId
+    const [expandedEquipmentId, setExpandedEquipmentId] = useState(null); // Theo dõi Equipment nào đang mở dropdown
+    const [selectedEquipment, setSelectedEquipment] = useState(null); // Equipment được chọn để đặt lịch
+    const [selectedEquipmentItemId, setSelectedEquipmentItemId] = useState(null); // EquipmentItem được chọn trong modal
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isBookingLater, setIsBookingLater] = useState(false);
     const [borrowDetails, setBorrowDetails] = useState({
-        borrowDate: new Date().toISOString().split('T')[0],
+        borrowDate: new Date().toISOString().slice(0, 16), // YYYY-MM-DDTHH:mm
         note: '',
     });
     const [submitting, setSubmitting] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [itemsLoading, setItemsLoading] = useState({}); // Trạng thái loading cho từng Equipment
     const [error, setError] = useState(null);
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
@@ -53,7 +57,27 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
         }
     }, [searchQuery, filterParams, pageSize, t]);
 
-    // Debounced fetchEquipmentData
+    const fetchEquipmentItems = useCallback(async (equipmentId) => {
+        try {
+            setItemsLoading((prev) => ({ ...prev, [equipmentId]: true }));
+            const response = await fetch(`${BASE_URL}/item/get?equipmentId=${equipmentId}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`${t('fetchError')}: ${errorText}`);
+            }
+            const data = await response.json();
+            setEquipmentItems((prev) => ({ ...prev, [equipmentId]: data || [] }));
+        } catch (err) {
+            console.error('Fetch equipment items error:', err);
+            setError(err.message);
+        } finally {
+            setItemsLoading((prev) => ({ ...prev, [equipmentId]: false }));
+        }
+    }, [t]);
+
     const debouncedFetchEquipmentData = useCallback(
         debounce((page) => {
             console.log('Debounced fetch triggered for page:', page);
@@ -62,15 +86,13 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
         [fetchEquipmentData]
     );
 
-    // Consolidated useEffect for searchQuery, filterParams, and initial load
     useEffect(() => {
         setLoading(true);
-        setCurrentPage(0); // Reset to page 0 on search/filter change
+        setCurrentPage(0);
         debouncedFetchEquipmentData(0);
         return () => debouncedFetchEquipmentData.cancel();
     }, [searchQuery, filterParams, debouncedFetchEquipmentData]);
 
-    // Handle page changes
     useEffect(() => {
         if (currentPage !== 0) {
             debouncedFetchEquipmentData(currentPage);
@@ -78,7 +100,6 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
         return () => debouncedFetchEquipmentData.cancel();
     }, [currentPage, debouncedFetchEquipmentData]);
 
-    // Initial fetch for categories and locations
     useEffect(() => {
         const fetchInitialData = async () => {
             try {
@@ -110,40 +131,61 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
         };
 
         fetchInitialData();
-    }, [t]);
+    }, [t, setCategories, setLocations]);
 
-    const openBorrowModal = (equipment, bookLater = false) => {
+    const toggleDropdown = (equipmentId) => {
+        if (expandedEquipmentId === equipmentId) {
+            setExpandedEquipmentId(null);
+        } else {
+            setExpandedEquipmentId(equipmentId);
+            if (!equipmentItems[equipmentId]) {
+                fetchEquipmentItems(equipmentId);
+            }
+        }
+    };
+
+    const openBorrowModal = (equipment) => {
         setSelectedEquipment(equipment);
-        setIsBookingLater(bookLater);
+        setSelectedEquipmentItemId(null); // Reset lựa chọn EquipmentItem
+        setIsBookingLater(true); // Luôn là đặt lịch trước
         setBorrowDetails({
-            borrowDate: bookLater && equipment.returnDate ? equipment.returnDate : new Date().toISOString().split('T')[0],
+            borrowDate: new Date().toISOString().slice(0, 16), // YYYY-MM-DDTHH:mm
             note: '',
         });
+        if (!equipmentItems[equipment.id]) {
+            fetchEquipmentItems(equipment.id);
+        }
         setIsModalOpen(true);
     };
 
     const handleBorrowRequest = async () => {
+        if (!selectedEquipmentItemId) {
+            alert(t('selectEquipmentItem'));
+            return;
+        }
         setSubmitting(true);
         try {
             const borrowData = {
-                equipmentId: selectedEquipment.id,
-                borrowDate: borrowDetails.borrowDate,
-                note: borrowDetails.note,
-                isBookingLater: isBookingLater,
+                equipmentItemId: selectedEquipmentItemId,
+                usersId: 1, // Giả sử user ID là 1, cần lấy từ user context hoặc state
+                borrowDate: borrowDetails.borrowDate + ':00', // Thêm giây để khớp định dạng ISO
+                status: 'PENDING',
             };
             const response = await fetch(`${BASE_URL}/borrow/add`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(borrowData),
             });
-            if (!response.ok) throw new Error(t(isBookingLater ? 'bookLaterError' : 'borrowError'));
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || t('bookLaterError'));
+            }
             setIsModalOpen(false);
-            alert(
-                isBookingLater
-                    ? t('bookLaterSuccess', { name: selectedEquipment.name })
-                    : t('borrowSuccess', { name: selectedEquipment.name })
-            );
-            fetchEquipmentData(currentPage); // Immediate fetch
+            alert(t('bookLaterSuccess', { name: selectedEquipment.name }));
+            fetchEquipmentData(currentPage); // Làm mới danh sách Equipment
+            if (expandedEquipmentId) {
+                fetchEquipmentItems(expandedEquipmentId); // Làm mới danh sách EquipmentItem
+            }
         } catch (err) {
             alert(err.message);
         } finally {
@@ -152,20 +194,54 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
     };
 
     const isBorrowDateValid = () => {
-        if (!isBookingLater) return true;
-        const minBorrowDate = selectedEquipment?.returnDate || new Date().toISOString().split('T')[0];
-        return borrowDetails.borrowDate >= minBorrowDate;
+        if (!selectedEquipmentItemId) return true;
+        const selectedItem = equipmentItems[selectedEquipment?.id]?.find(
+            (item) => item.id === parseInt(selectedEquipmentItemId)
+        );
+        if (!selectedItem || !selectedItem.returnDate) {
+            return new Date(borrowDetails.borrowDate) >= new Date();
+        }
+        return new Date(borrowDetails.borrowDate) >= new Date(selectedItem.returnDate);
+    };
+
+    const formatReturnDate = (returnDate) => {
+        if (!returnDate) return '-';
+        try {
+            const date = new Date(returnDate);
+            if (isNaN(date.getTime())) return '-';
+            return date.toLocaleString('en-GB', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            }).replace(',', ''); // Định dạng YYYY-MM-DD HH:mm
+        } catch {
+            return '-';
+        }
+    };
+
+    const formatReturnDateForInput = (returnDate) => {
+        if (!returnDate) return new Date().toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+        try {
+            const date = new Date(returnDate);
+            if (isNaN(date.getTime())) return new Date().toISOString().slice(0, 16);
+            return date.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+        } catch {
+            return new Date().toISOString().slice(0, 16);
+        }
     };
 
     function getStatusColor(status) {
         switch (status) {
-            case 'Broken':
+            case 'BROKEN':
                 return 'bg-red-100 text-red-700 border-red-200';
-            case 'Active':
+            case 'ACTIVE':
                 return 'bg-green-100 text-green-700 border-green-200';
-            case 'Maintenance':
+            case 'MAINTENANCE':
                 return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-            case 'Borrowed':
+            case 'BORROWED':
                 return 'bg-blue-100 text-blue-700 border-blue-200';
             default:
                 return 'bg-gray-100 text-gray-700 border-gray-200';
@@ -174,13 +250,13 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
 
     const getTranslatedStatus = (status) => {
         switch (status) {
-            case 'Active':
+            case 'ACTIVE':
                 return t('statusActive');
-            case 'Broken':
+            case 'BROKEN':
                 return t('statusBroken');
-            case 'Maintenance':
+            case 'MAINTENANCE':
                 return t('statusMaintenance');
-            case 'Borrowed':
+            case 'BORROWED':
                 return t('statusBorrowed');
             default:
                 return status;
@@ -245,19 +321,28 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('name')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('image')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('quantity')}</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('status')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('category')}</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('location')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('description')}</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('returnDate')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('actions')}</th>
                         </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                        {
-                            equipments.map((equipment) => (
-                                <tr key={equipment.id}>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{equipment.name}</td>
+                        {equipments.map((equipment) => (
+                            <Fragment key={`equipment-${equipment.id}`}>
+                                <tr>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <button
+                                            onClick={() => toggleDropdown(equipment.id)}
+                                            className="flex items-center text-blue-600 hover:text-blue-800"
+                                        >
+                                            {equipment.name}
+                                            {expandedEquipmentId === equipment.id ? (
+                                                <ChevronUp size={16} className="ml-2" />
+                                            ) : (
+                                                <ChevronDown size={16} className="ml-2" />
+                                            )}
+                                        </button>
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         {equipment.imageUrl ? (
                                             <img
@@ -272,42 +357,61 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                                         ) : t('noImage')}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{equipment.quantity}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        <span className={`inline-block px-3 py-1 text-sm font-medium rounded-full border ${getStatusColor(equipment.status)}`}>
-                                            {getTranslatedStatus(equipment.status)}
-                                        </span>
-                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{equipment.categoryName || '-'}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{equipment.locationName || '-'}</td>
                                     <td className="px-6 py-4 text-sm text-gray-500">{equipment.description || '-'}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{equipment.returnDate || '-'}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm flex space-x-2">
-                                        {equipment.quantity > 0 && equipment.status === 'Active' ? (
-                                            <button
-                                                onClick={() => openBorrowModal(equipment, false)}
-                                                className="relative text-blue-600 hover:text-blue-800 group"
-                                            >
-                                                <PlusCircle size={20} />
-                                                <span className="absolute hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2 -top-8 left-1/2 transform -translate-x-1/2">
-                                                    {t('borrow')}
-                                                </span>
-                                            </button>
-                                        ) : (
-                                            <button
-                                                onClick={() => openBorrowModal(equipment, true)}
-                                                className="relative text-green-600 hover:text-green-800 group"
-                                                disabled={equipment.status !== 'Active' && equipment.status !== 'Borrowed'}
-                                            >
-                                                <Calendar size={20} />
-                                                <span className="absolute hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2 -top-8 left-1/2 transform -translate-x-1/2">
-                                                    {t('bookLater')}
-                                                </span>
-                                            </button>
-                                        )}
+                                        <button
+                                            onClick={() => openBorrowModal(equipment)}
+                                            className="relative text-green-600 hover:text-green-800 group"
+                                        >
+                                            <Calendar size={20} />
+                                            <span className="absolute hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2 -top-8 left-1/2 transform -translate-x-1/2">
+                                                {t('bookLater')}
+                                            </span>
+                                        </button>
                                     </td>
                                 </tr>
-                            ))
-                        }
+                                {expandedEquipmentId === equipment.id && (
+                                    <tr key={`expanded-${equipment.id}`}>
+                                        <td colSpan="6" className="bg-gray-50 p-4">
+                                            {itemsLoading[equipment.id] ? (
+                                                <p className="text-gray-600">{t('loading')}...</p>
+                                            ) : equipmentItems[equipment.id]?.length > 0 ? (
+                                                <div className="space-y-2">
+                                                    <h4 className="text-sm font-semibold text-gray-900">{t('equipmentItems')}</h4>
+                                                    <table className="min-w-full divide-y divide-gray-200">
+                                                        <thead className="bg-gray-100">
+                                                        <tr>
+                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('serialNumber')}</th>
+                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('status')}</th>
+                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('location')}</th>
+                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('returnDate')}</th>
+                                                        </tr>
+                                                        </thead>
+                                                        <tbody className="bg-white divide-y divide-gray-200">
+                                                        {equipmentItems[equipment.id].map((item) => (
+                                                            <tr key={`item-${item.id}`}>
+                                                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{item.serialNumber}</td>
+                                                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                                                                    <span className={`inline-block px-3 py-1 text-sm font-medium rounded-full border ${getStatusColor(item.status)}`}>
+                                                                        {getTranslatedStatus(item.status)}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{item.locationName || '-'}</td>
+                                                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{formatReturnDate(item.returnDate)}</td>
+                                                            </tr>
+                                                        ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            ) : (
+                                                <p className="text-gray-600">{t('noEquipmentItems')}</p>
+                                            )}
+                                        </td>
+                                    </tr>
+                                )}
+                            </Fragment>
+                        ))}
                         </tbody>
                     </table>
                     <div className="flex justify-end items-center p-4">
@@ -341,23 +445,48 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
             {isModalOpen && (
                 <div className="fixed inset-0 bg-opacity-50 flex items-center justify-center z-50 bg-black/30">
                     <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md pointer-events-auto">
-                        <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                            {isBookingLater ? t('bookLaterEquipment') : t('borrowEquipment')}
-                        </h2>
+                        <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('bookLaterEquipment')}</h2>
                         <p className="text-gray-600 mb-4">
-                            {isBookingLater
-                                ? t('bookLaterConfirm', { name: selectedEquipment?.name })
-                                : t('borrowConfirm', { name: selectedEquipment?.name })}
+                            {t('bookLaterConfirm', { name: selectedEquipment?.name })}
                         </p>
                         <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700">
-                                {isBookingLater ? t('bookingDate') : t('borrowDate')}
-                            </label>
+                            <label className="block text-sm font-medium text-gray-700">{t('equipmentItem')}</label>
+                            {itemsLoading[selectedEquipment?.id] ? (
+                                <p className="text-gray-600">{t('loading')}...</p>
+                            ) : equipmentItems[selectedEquipment?.id]?.length > 0 ? (
+                                <select
+                                    value={selectedEquipmentItemId || ''}
+                                    onChange={(e) => setSelectedEquipmentItemId(e.target.value)}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                    required
+                                >
+                                    <option value="">{t('selectEquipmentItem')}</option>
+                                    {equipmentItems[selectedEquipment.id]
+                                        .filter((item) => item.status === 'ACTIVE' || item.status === 'BORROWED')
+                                        .map((item) => (
+                                            <option key={`option-${item.id}`} value={item.id}>
+                                                {item.serialNumber} ({getTranslatedStatus(item.status)}, {item.locationName || 'No Location'})
+                                            </option>
+                                        ))}
+                                </select>
+                            ) : (
+                                <p className="text-gray-600">{t('noEquipmentItems')}</p>
+                            )}
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700">{t('bookingDate')}</label>
                             <input
-                                type="date"
+                                type="datetime-local"
                                 value={borrowDetails.borrowDate}
                                 onChange={(e) => setBorrowDetails({ ...borrowDetails, borrowDate: e.target.value })}
-                                min={isBookingLater ? selectedEquipment?.returnDate || new Date().toISOString().split('T')[0] : undefined}
+                                min={selectedEquipmentItemId
+                                    ? formatReturnDateForInput(
+                                        equipmentItems[selectedEquipment?.id]?.find(
+                                            (item) => item.id === parseInt(selectedEquipmentItemId)
+                                        )?.returnDate
+                                    )
+                                    : new Date().toISOString().slice(0, 16)
+                                }
                                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                 required
                             />
@@ -379,7 +508,7 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                             <button
                                 onClick={handleBorrowRequest}
                                 className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-400"
-                                disabled={submitting || (isBookingLater && !isBorrowDateValid())}
+                                disabled={submitting || !selectedEquipmentItemId || !isBorrowDateValid()}
                             >
                                 {submitting ? (
                                     <Loader2 size={20} className="mr-2 animate-spin" />
