@@ -1,4 +1,4 @@
-import {useState, useEffect, useCallback, Fragment} from 'react';
+import { useState, useEffect, useCallback, Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CheckCircle, XCircle, Loader2, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
 import 'react-loading-skeleton/dist/skeleton.css';
@@ -7,19 +7,20 @@ import debounce from 'lodash.debounce';
 export default function BorrowTable({ searchQuery, filterParams, setCategories, setLocations }) {
     const { t } = useTranslation();
     const [equipments, setEquipments] = useState([]);
-    const [equipmentItems, setEquipmentItems] = useState({}); // Lưu danh sách EquipmentItem theo equipmentId
-    const [expandedEquipmentId, setExpandedEquipmentId] = useState(null); // Theo dõi Equipment nào đang mở dropdown
-    const [selectedEquipment, setSelectedEquipment] = useState(null); // Equipment được chọn để đặt lịch
-    const [selectedEquipmentItemId, setSelectedEquipmentItemId] = useState(null); // EquipmentItem được chọn trong modal
+    const [equipmentItems, setEquipmentItems] = useState({});
+    const [equipmentQuantities, setEquipmentQuantities] = useState({});
+    const [expandedEquipmentId, setExpandedEquipmentId] = useState(null);
+    const [selectedEquipment, setSelectedEquipment] = useState(null);
+    const [selectedEquipmentItemId, setSelectedEquipmentItemId] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isBookingLater, setIsBookingLater] = useState(false);
     const [borrowDetails, setBorrowDetails] = useState({
-        borrowDate: new Date().toISOString().slice(0, 16), // YYYY-MM-DDTHH:mm
+        borrowDate: new Date().toISOString().slice(0, 16),
         note: '',
     });
     const [submitting, setSubmitting] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [itemsLoading, setItemsLoading] = useState({}); // Trạng thái loading cho từng Equipment
+    const [itemsLoading, setItemsLoading] = useState({});
     const [error, setError] = useState(null);
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
@@ -32,7 +33,6 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
             setLoading(true);
             let url = `${BASE_URL}/equipment/get?page=${page}&size=${pageSize}`;
             if (searchQuery) url += `&name=${encodeURIComponent(searchQuery)}`;
-            if (filterParams.filterDate) url += `&returnDate=${filterParams.filterDate}`;
             if (filterParams.filterCategory) url += `&categoryId=${filterParams.filterCategory}`;
             if (filterParams.filterLocation) url += `&locationId=${filterParams.filterLocation}`;
             if (filterParams.filterStatus) url += `&status=${filterParams.filterStatus}`;
@@ -47,7 +47,34 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                 throw new Error(`${t('fetchError')}: ${errorText}`);
             }
             const data = await response.json();
-            setEquipments(data.content || []);
+            const equipmentList = data.content || [];
+
+            const quantities = {};
+            await Promise.all(
+                equipmentList.map(async (equipment) => {
+                    let itemUrl = `${BASE_URL}/item/get?equipmentId=${equipment.id}`;
+                    if (filterParams.filterLocation) itemUrl += `&locationId=${filterParams.filterLocation}`;
+                    try {
+                        const itemResponse = await fetch(itemUrl, {
+                            method: 'GET',
+                            headers: { 'Content-Type': 'application/json' },
+                        });
+                        if (!itemResponse.ok) {
+                            console.error(`Failed to fetch items for equipment ${equipment.id}`);
+                            quantities[equipment.id] = 0;
+                            return;
+                        }
+                        const items = await itemResponse.json();
+                        quantities[equipment.id] = items.length;
+                    } catch (err) {
+                        console.error(`Error fetching items for equipment ${equipment.id}:`, err);
+                        quantities[equipment.id] = 0;
+                    }
+                })
+            );
+
+            setEquipments(equipmentList);
+            setEquipmentQuantities(quantities);
             setTotalPages(data.totalPages || 1);
         } catch (err) {
             console.error('Fetch equipment error:', err);
@@ -60,7 +87,11 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
     const fetchEquipmentItems = useCallback(async (equipmentId) => {
         try {
             setItemsLoading((prev) => ({ ...prev, [equipmentId]: true }));
-            const response = await fetch(`${BASE_URL}/item/get?equipmentId=${equipmentId}`, {
+            let url = `${BASE_URL}/item/get?equipmentId=${equipmentId}`;
+            if (filterParams.filterLocation) url += `&locationId=${filterParams.filterLocation}`;
+
+            console.log('Fetching equipment items URL:', url);
+            const response = await fetch(url, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
@@ -76,7 +107,7 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
         } finally {
             setItemsLoading((prev) => ({ ...prev, [equipmentId]: false }));
         }
-    }, [t]);
+    }, [t, filterParams.filterLocation]);
 
     const debouncedFetchEquipmentData = useCallback(
         debounce((page) => {
@@ -146,10 +177,10 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
 
     const openBorrowModal = (equipment) => {
         setSelectedEquipment(equipment);
-        setSelectedEquipmentItemId(null); // Reset lựa chọn EquipmentItem
-        setIsBookingLater(true); // Luôn là đặt lịch trước
+        setSelectedEquipmentItemId(null);
+        setIsBookingLater(true);
         setBorrowDetails({
-            borrowDate: new Date().toISOString().slice(0, 16), // YYYY-MM-DDTHH:mm
+            borrowDate: new Date().toISOString().slice(0, 16),
             note: '',
         });
         if (!equipmentItems[equipment.id]) {
@@ -167,8 +198,8 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
         try {
             const borrowData = {
                 equipmentItemId: selectedEquipmentItemId,
-                usersId: 1, // Giả sử user ID là 1, cần lấy từ user context hoặc state
-                borrowDate: borrowDetails.borrowDate + ':00', // Thêm giây để khớp định dạng ISO
+                usersId: 1,
+                borrowDate: borrowDetails.borrowDate + ':00',
                 status: 'PENDING',
             };
             const response = await fetch(`${BASE_URL}/borrow/add`, {
@@ -182,9 +213,9 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
             }
             setIsModalOpen(false);
             alert(t('bookLaterSuccess', { name: selectedEquipment.name }));
-            fetchEquipmentData(currentPage); // Làm mới danh sách Equipment
+            fetchEquipmentData(currentPage);
             if (expandedEquipmentId) {
-                fetchEquipmentItems(expandedEquipmentId); // Làm mới danh sách EquipmentItem
+                fetchEquipmentItems(expandedEquipmentId);
             }
         } catch (err) {
             alert(err.message);
@@ -216,18 +247,18 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                 hour: '2-digit',
                 minute: '2-digit',
                 hour12: false
-            }).replace(',', ''); // Định dạng YYYY-MM-DD HH:mm
+            }).replace(',', '');
         } catch {
             return '-';
         }
     };
 
     const formatReturnDateForInput = (returnDate) => {
-        if (!returnDate) return new Date().toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+        if (!returnDate) return new Date().toISOString().slice(0, 16);
         try {
             const date = new Date(returnDate);
             if (isNaN(date.getTime())) return new Date().toISOString().slice(0, 16);
-            return date.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+            return date.toISOString().slice(0, 16);
         } catch {
             return new Date().toISOString().slice(0, 16);
         }
@@ -333,13 +364,13 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                         <button
                                             onClick={() => toggleDropdown(equipment.id)}
-                                            className="flex items-center text-blue-600 hover:text-blue-800"
+                                            className="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 font-medium rounded-md shadow-sm hover:bg-blue-100 hover:scale-105 active:scale-95 transition-all duration-200 animate-fade-in"
                                         >
                                             {equipment.name}
                                             {expandedEquipmentId === equipment.id ? (
-                                                <ChevronUp size={16} className="ml-2" />
+                                                <ChevronUp size={20} className="ml-2" />
                                             ) : (
-                                                <ChevronDown size={16} className="ml-2" />
+                                                <ChevronDown size={20} className="ml-2" />
                                             )}
                                         </button>
                                     </td>
@@ -356,7 +387,9 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                                             />
                                         ) : t('noImage')}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{equipment.quantity}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {equipmentQuantities[equipment.id] !== undefined ? equipmentQuantities[equipment.id] : '-'}
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{equipment.categoryName || '-'}</td>
                                     <td className="px-6 py-4 text-sm text-gray-500">{equipment.description || '-'}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm flex space-x-2">
@@ -375,37 +408,40 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                                     <tr key={`expanded-${equipment.id}`}>
                                         <td colSpan="6" className="bg-gray-50 p-4">
                                             {itemsLoading[equipment.id] ? (
-                                                <p className="text-gray-600">{t('loading')}...</p>
+                                                <div className="flex justify-center items-center py-4">
+                                                    <Loader2 size={24} className="animate-spin text-gray-600" />
+                                                    <span className="ml-2 text-gray-600">{t('loading')}...</span>
+                                                </div>
                                             ) : equipmentItems[equipment.id]?.length > 0 ? (
-                                                <div className="space-y-2">
-                                                    <h4 className="text-sm font-semibold text-gray-900">{t('equipmentItems')}</h4>
-                                                    <table className="min-w-full divide-y divide-gray-200">
-                                                        <thead className="bg-gray-100">
-                                                        <tr>
-                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('serialNumber')}</th>
-                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('status')}</th>
-                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('location')}</th>
-                                                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('returnDate')}</th>
-                                                        </tr>
-                                                        </thead>
-                                                        <tbody className="bg-white divide-y divide-gray-200">
+                                                <div className="max-h-80 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                                                    <div className="grid gap-4 sm:grid-cols-2">
                                                         {equipmentItems[equipment.id].map((item) => (
-                                                            <tr key={`item-${item.id}`}>
-                                                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{item.serialNumber}</td>
-                                                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
-                                                                    <span className={`inline-block px-3 py-1 text-sm font-medium rounded-full border ${getStatusColor(item.status)}`}>
-                                                                        {getTranslatedStatus(item.status)}
-                                                                    </span>
-                                                                </td>
-                                                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{item.locationName || '-'}</td>
-                                                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{formatReturnDate(item.returnDate)}</td>
-                                                            </tr>
+                                                            <div
+                                                                key={`item-${item.id}`}
+                                                                className="p-4 bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-gray-100 transition-colors duration-200"
+                                                            >
+                                                                <div className="flex flex-col space-y-2">
+                                                                    <div className="flex justify-between items-center">
+                                                                        <span className="text-sm font-medium text-gray-900">
+                                                                            {t('serialNumber')}: {item.serialNumber}
+                                                                        </span>
+                                                                        <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full border ${getStatusColor(item.status)}`}>
+                                                                            {getTranslatedStatus(item.status)}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="text-sm text-gray-600">
+                                                                        <span className="font-medium">{t('location')}:</span> {item.locationName || '-'}
+                                                                    </div>
+                                                                    <div className="text-sm text-gray-600">
+                                                                        <span className="font-medium">{t('returnDate')}:</span> {formatReturnDate(item.returnDate)}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
                                                         ))}
-                                                        </tbody>
-                                                    </table>
+                                                    </div>
                                                 </div>
                                             ) : (
-                                                <p className="text-gray-600">{t('noEquipmentItems')}</p>
+                                                <p className="text-gray-600 text-center py-4">{t('noEquipmentItems')}</p>
                                             )}
                                         </td>
                                     </tr>
