@@ -191,6 +191,9 @@ i18n
                     note: 'Note',
                     selectEquipmentItem: 'Select equipment item',
                     serialNumber: 'Serial number',
+                    noEquipmentItems: 'No equipment items',
+                    noEquipments: 'No equipments',
+                    noEquipment: 'No equipment',
                 },
             },
             vi: {
@@ -378,6 +381,7 @@ i18n
                     bookingDate: "Chọn ngày",
                     note: "Ghi chú",
                     serialNumber: "Số serial",
+                    noEquipmentItems: "Không có thiết bị nào"
                 },
             },
         },

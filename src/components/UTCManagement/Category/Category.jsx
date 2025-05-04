@@ -198,20 +198,20 @@ export default function Category() {
                 <table className="min-w-full">
                     <thead className="bg-gray-200 text-gray-700">
                     <tr>
-                        <th className="py-4 px-6 text-left font-semibold">{t('id')}</th>
-                        <th className="py-4 px-6 text-left font-semibold">{t('categoryName')}</th>
-                        <th className="py-4 px-6 text-left font-semibold">{t('description')}</th>
-                        <th className="py-4 px-6 font-semibold">{t('actions')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('id')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('categoryName')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('description')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('actions')}</th>
                     </tr>
                     </thead>
                     <tbody>
                     {categoryData.map((category) => (
                         <tr key={category.id} className="border-t border-gray-200 hover:bg-gray-50">
-                            <td className="py-4 px-6 text-gray-800">{category.id}</td>
-                            <td className="py-4 px-6 text-gray-800">{category.categoryName}</td>
-                            <td className="py-4 px-6 text-gray-800">{category.description}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{category.id}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{category.categoryName}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{category.description}</td>
                             <td className="py-4 px-6 text-center">
-                                <div className="flex justify-center gap-3">
+                                <div className="flex space-x-3">
                                     <button
                                         className="p-2 text-blue-700 font-bold rounded-md hover:bg-blue-600 hover:text-white transition duration-200 cursor-pointer"
                                         onClick={() => handleOpenEditModal(category)}

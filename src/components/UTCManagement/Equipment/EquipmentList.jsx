@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import SearchBar from '../Nav/SearchBar.jsx';
-import { Pencil, Trash2, Plus } from 'lucide-react';
+import { Pencil, Trash2, Plus, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import AddEquipment from './AddEquipment.jsx';
 import EditEquipment from './EditEquipment.jsx';
 import DeleteEquipment from './DeleteEquipment.jsx';
@@ -13,6 +13,7 @@ export default function EquipmentList() {
     const [equipmentData, setEquipmentData] = useState([]);
     const [locations, setLocations] = useState([]);
     const [categories, setCategories] = useState([]);
+    const [equipmentQuantities, setEquipmentQuantities] = useState({});
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -32,13 +33,17 @@ export default function EquipmentList() {
     const [error, setError] = useState(null);
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
-    const [pageSize] = useState(10);
-    const [searchTerm] = useState('');
+    const [pageSize] = useState(4);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [expandedEquipmentId, setExpandedEquipmentId] = useState(null);
+    const [equipmentItems, setEquipmentItems] = useState({});
+    const [itemsLoading, setItemsLoading] = useState({});
 
     const BASE_URL = 'http://localhost:9090';
 
     const fetchEquipmentData = async (page = 0, search = '') => {
         try {
+            setLoading(true);
             const url = search
                 ? `${BASE_URL}/equipment/get?name=${encodeURIComponent(search)}&page=${page}&size=${pageSize}`
                 : `${BASE_URL}/equipment/get?page=${page}&size=${pageSize}`;
@@ -48,8 +53,35 @@ export default function EquipmentList() {
             });
             if (!response.ok) throw new Error(t('fetchError'));
             const data = await response.json();
-            setEquipmentData(data.content || []);
-            setTotalPages(data.page.totalPages || 1);
+
+            const equipmentList = data.content || [];
+
+            // Fetch quantities for each equipment
+            const quantities = {};
+            await Promise.all(
+                equipmentList.map(async (equipment) => {
+                    try {
+                        const itemResponse = await fetch(`${BASE_URL}/item/get?equipmentId=${equipment.id}`, {
+                            method: 'GET',
+                            headers: { 'Content-Type': 'application/json' },
+                        });
+                        if (!itemResponse.ok) {
+                            console.error(`Failed to fetch items for equipment ${equipment.id}`);
+                            quantities[equipment.id] = 0;
+                            return;
+                        }
+                        const items = await itemResponse.json();
+                        quantities[equipment.id] = items.length;
+                    } catch (err) {
+                        console.error(`Error fetching items for equipment ${equipment.id}:`, err);
+                        quantities[equipment.id] = 0;
+                    }
+                })
+            );
+
+            setEquipmentData(equipmentList);
+            setEquipmentQuantities(quantities);
+            setTotalPages(data.totalPages || 1);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -57,9 +89,37 @@ export default function EquipmentList() {
         }
     };
 
+    const fetchEquipmentItems = async (equipmentId) => {
+        try {
+            setItemsLoading((prev) => ({ ...prev, [equipmentId]: true }));
+            const response = await fetch(`${BASE_URL}/item/get?equipmentId=${equipmentId}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            if (!response.ok) throw new Error(t('fetchError'));
+            const data = await response.json();
+            setEquipmentItems((prev) => ({ ...prev, [equipmentId]: data || [] }));
+        } catch (err) {
+            console.error('Failed to fetch equipment items:', err);
+        } finally {
+            setItemsLoading((prev) => ({ ...prev, [equipmentId]: false }));
+        }
+    };
+
+    const toggleDropdown = (equipmentId) => {
+        if (expandedEquipmentId === equipmentId) {
+            setExpandedEquipmentId(null);
+        } else {
+            setExpandedEquipmentId(equipmentId);
+            if (!equipmentItems[equipmentId]) {
+                fetchEquipmentItems(equipmentId);
+            }
+        }
+    };
+
     const fetchCategories = async () => {
         try {
-            const response = await fetch(`${BASE_URL}/category/get?page=0&size=10`, {
+            const response = await fetch(`${BASE_URL}/category/get?page=0&size=100`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
@@ -73,7 +133,7 @@ export default function EquipmentList() {
 
     const fetchLocations = async () => {
         try {
-            const response = await fetch(`${BASE_URL}/location/get-all?page=0&size=10`, {
+            const response = await fetch(`${BASE_URL}/location/get?page=0&size=100`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
@@ -86,7 +146,9 @@ export default function EquipmentList() {
     };
 
     const handleSearch = (term) => {
-        fetchEquipmentData(currentPage, term);
+        setSearchTerm(term);
+        setCurrentPage(0);
+        fetchEquipmentData(0, term);
     };
 
     useEffect(() => {
@@ -119,11 +181,6 @@ export default function EquipmentList() {
             formData.append('equipment', equipmentBlob);
             if (newEquipmentData.image) formData.append('image', newEquipmentData.image);
 
-            // console.log('FormData được gửi khi thêm:');
-            // for (let pair of formData.entries()) {
-            //     console.log(pair[0] + ': ' + pair[1]);
-            // }
-
             const response = await fetch(`${BASE_URL}/equipment/add`, {
                 method: 'POST',
                 body: formData,
@@ -131,7 +188,6 @@ export default function EquipmentList() {
 
             if (!response.ok) {
                 const errorText = await response.text();
-                // console.error('Add failed with status:', response.status, 'Response:', errorText);
                 throw new Error(t('addError') + errorText);
             }
 
@@ -148,7 +204,8 @@ export default function EquipmentList() {
             setIsAddModalOpen(false);
             fetchEquipmentData(currentPage, searchTerm);
         } catch (err) {
-            alert(err.message);
+            console.error('Failed to add equipment:', err);
+            alert(t('err.message'));
         }
     };
 
@@ -172,11 +229,6 @@ export default function EquipmentList() {
             formData.append('equipment', equipmentBlob);
             if (selectedEquipment.image instanceof File) formData.append('image', selectedEquipment.image);
 
-            // console.log('FormData được gửi:');
-            // for (let pair of formData.entries()) {
-            //     console.log(pair[0] + ': ' + pair[1]);
-            // }
-
             const response = await fetch(`${BASE_URL}/equipment/update/${selectedEquipment.id}`, {
                 method: 'PATCH',
                 body: formData,
@@ -191,8 +243,13 @@ export default function EquipmentList() {
             setIsEditModalOpen(false);
             setSelectedEquipment(null);
             fetchEquipmentData(currentPage, searchTerm);
+
+            // Refresh items if the expanded equipment is being edited
+            if (expandedEquipmentId === selectedEquipment.id) {
+                fetchEquipmentItems(selectedEquipment.id);
+            }
         } catch (err) {
-            alert(err.message);
+            alert(t('err.message'));
         }
     };
 
@@ -207,19 +264,24 @@ export default function EquipmentList() {
             setEquipmentToDelete(null);
             fetchEquipmentData(currentPage, searchTerm);
         } catch (err) {
-            alert(err.message);
+            console.error(err);
+            alert(t('err.message'));
         }
     };
 
     function getStatusColor(status) {
         switch (status) {
             case 'Broken':
+            case 'BROKEN':
                 return 'bg-red-100 text-red-700 border-red-200';
             case 'Active':
+            case 'ACTIVE':
                 return 'bg-green-100 text-green-700 border-green-200';
             case 'Maintenance':
+            case 'MAINTENANCE':
                 return 'bg-yellow-100 text-yellow-700 border-yellow-200';
             case 'Borrowed':
+            case 'BORROWED':
                 return 'bg-blue-100 text-blue-700 border-blue-200';
             default:
                 return 'bg-gray-100 text-gray-700 border-gray-200';
@@ -229,12 +291,16 @@ export default function EquipmentList() {
     const getTranslatedStatus = (status) => {
         switch (status) {
             case 'Active':
+            case 'ACTIVE':
                 return t('statusActive');
             case 'Broken':
+            case 'BROKEN':
                 return t('statusBroken');
             case 'Maintenance':
+            case 'MAINTENANCE':
                 return t('statusMaintenance');
             case 'Borrowed':
+            case 'BORROWED':
                 return t('statusBorrowed');
             default:
                 return status;
@@ -248,10 +314,9 @@ export default function EquipmentList() {
         }
     };
 
-    // Tạo danh sách số trang
     const renderPageNumbers = () => {
         const pageNumbers = [];
-        const maxPagesToShow = 5; // Số lượng trang tối đa hiển thị
+        const maxPagesToShow = 5;
         let startPage = Math.max(0, currentPage - Math.floor(maxPagesToShow / 2));
         let endPage = Math.min(totalPages - 1, startPage + maxPagesToShow - 1);
 
@@ -277,6 +342,16 @@ export default function EquipmentList() {
 
         return pageNumbers;
     };
+
+    const formatDate = (date) => {
+        if (!date) return '-';
+        try {
+            return format(new Date(date), 'dd/MM/yyyy HH:mm');
+        } catch {
+            return '-';
+        }
+    };
+
     const handleOpenAddModal = () => setIsAddModalOpen(true);
     const handleOpenEditModal = (equipment) => {
         const selectedCategory = categories.find(cat => cat.categoryName === equipment.categoryName);
@@ -309,8 +384,28 @@ export default function EquipmentList() {
         setSelectedEquipment((prev) => ({ ...prev, image: e.target.files[0] }));
     };
 
-    if (loading) return <div className="min-h-screen p-6 min-w-full flex items-center justify-center"><p>{t('loading')}</p></div>;
-    if (error) return <div className="min-h-screen p-6 min-w-full flex items-center justify-center"><p className="text-red-600">{t('error')}: {error}</p></div>;
+    if (loading && equipmentData.length === 0) {
+        return (
+            <div className="min-h-screen p-6 flex items-center justify-center">
+                <Loader2 size={24} className="animate-spin mr-2" />
+                <p>{t('loading')}</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="min-h-screen p-6 flex items-center justify-center">
+                <p className="text-red-600">{t('error')}: {error}</p>
+                <button
+                    onClick={() => fetchEquipmentData(0, searchTerm)}
+                    className="ml-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                    {t('retry')}
+                </button>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen p-6 min-w-full overflow-auto">
@@ -318,7 +413,7 @@ export default function EquipmentList() {
                 <h1 className="text-3xl font-bold text-gray-900">{t('equipments')}</h1>
             </div>
             <div className="mb-6 flex justify-between items-center">
-                <SearchBar onSearch={handleSearch} />
+                <SearchBar onSearch={handleSearch} value={searchTerm} />
                 <button
                     className="flex items-center gap-2 bg-black text-white py-2 px-4 rounded-md hover:bg-gray-700 transition duration-200"
                     onClick={handleOpenAddModal}
@@ -328,72 +423,127 @@ export default function EquipmentList() {
                 </button>
             </div>
             <div className="bg-white shadow-md rounded-lg mb-4">
-                <table className="min-w-full">
+                <table className="min-w-full table-fixed">
                     <thead className="bg-gray-200 text-gray-700">
                     <tr className="rounded-t-lg">
-                        <th className="py-4 px-6 text-left font-semibold">{t('id')}</th>
-                        <th className="py-4 px-6 text-left font-semibold">{t('equipmentName')}</th>
-                        <th className="py-4 px-6 text-left font-semibold">{t('image')}</th>
-                        <th className="py-4 px-6 text-left font-semibold">{t('quantity')}</th>
-                        <th className="py-4 px-6 text-left font-semibold">{t('status')}</th>
-                        <th className="py-4 px-6 text-left font-semibold">{t('purchaseDate')}</th>
-                        <th className="py-4 px-6 text-left font-semibold">{t('category')}</th>
-                        <th className="py-4 px-6 text-left font-semibold">{t('location')}</th>
-                        <th className="py-4 px-6 text-left font-semibold w-80">{t('description')}</th>
-                        <th className="py-4 px-6 font-semibold">{t('actions')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('id')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('equipmentName')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('image')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('quantity')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('category')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('purchaseDate')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('description')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('actions')}</th>
                     </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="bg-white divide-y divide-gray-200">
                     {equipmentData.map((equipment) => (
-                        <tr key={equipment.id} className="border-t border-gray-200 hover:bg-gray-50">
-                            <td className="py-4 px-6 text-gray-800">{equipment.id}</td>
-                            <td className="py-4 px-6 text-gray-800">{equipment.name}</td>
-                            <td className="py-4 px-6 text-gray-800">
-                                {equipment.imageUrl ? (
-                                    <img
-                                        src={equipment.imageUrl}
-                                        alt={equipment.name}
-                                        className="w-16 h-16 object-cover rounded"
-                                        onError={(e) => {
-                                            console.error(`Failed to load image: ${equipment.imageUrl}`);
-                                            e.target.src = '/fallback-image.png';
-                                        }}
-                                    />
-                                ) : (t('noImage'))}
-                            </td>
-                            <td className="py-4 px-6 text-gray-800">{equipment.quantity}</td>
-                            <td className="py-4 px-6">
-                                    <span className={`inline-block px-3 py-1 text-sm font-medium rounded-full border ${getStatusColor(equipment.status)}`}>
-                                        {getTranslatedStatus(equipment.status)}
-                                    </span>
-                            </td>
-                            <td className="py-4 px-6 text-gray-800">
-                                {format(new Date(equipment.purchaseDate), 'dd/MM/yyyy HH:mm')}
-                            </td>
-                            <td className="py-4 px-6 text-gray-800">{equipment.categoryName}</td>
-                            <td className="py-4 px-6 text-gray-800">{equipment.locationName}</td>
-                            <td className="py-4 px-6 text-gray-800">{equipment.description}</td>
-                            <td className="py-4 px-6 text-center">
-                                <div className="flex justify-center gap-3">
+                        <Fragment key={`equipment-${equipment.id}`}>
+                            <tr className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{equipment.id}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">
                                     <button
-                                        className="p-2 text-blue-700 font-bold rounded-md hover:bg-blue-600 hover:text-white transition duration-200 cursor-pointer"
-                                        onClick={() => handleOpenEditModal(equipment)}
+                                        onClick={() => toggleDropdown(equipment.id)}
+                                        className="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 font-medium rounded-md shadow-sm hover:bg-blue-100 hover:scale-105 active:scale-95 transition-all duration-200"
                                     >
-                                        <Pencil size={16} />
+                                        {equipment.name}
+                                        {expandedEquipmentId === equipment.id ? (
+                                            <ChevronUp size={20} className="ml-2" />
+                                        ) : (
+                                            <ChevronDown size={20} className="ml-2" />
+                                        )}
                                     </button>
-                                    <button
-                                        className="px-2 py-1 text-red-700 font-bold rounded-md hover:bg-red-500 hover:text-white transition duration-200 cursor-pointer"
-                                        onClick={() => handleOpenDeleteModal(equipment)}
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                    {equipment.imageUrl ? (
+                                        <img
+                                            src={equipment.imageUrl}
+                                            alt={equipment.name}
+                                            className="w-16 h-16 object-cover rounded"
+                                            onError={(e) => {
+                                                console.error(`Failed to load image: ${equipment.imageUrl}`);
+                                                e.target.src = '/fallback-image.png';
+                                            }}
+                                        />
+                                    ) : t('noImage')}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+                                    {equipmentQuantities[equipment.id] !== undefined ? equipmentQuantities[equipment.id] : '-'}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{equipment.categoryName}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{formatDate(equipment.purchaseDate)}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{equipment.description || '-'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="flex space-x-3">
+                                        <button
+                                            className="p-2 text-blue-700 rounded-md hover:bg-blue-100 transition duration-200"
+                                            onClick={() => handleOpenEditModal(equipment)}
+                                        >
+                                            <Pencil size={16} />
+                                        </button>
+                                        <button
+                                            className="p-2 text-red-700 rounded-md hover:bg-red-100 transition duration-200"
+                                            onClick={() => handleOpenDeleteModal(equipment)}
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {expandedEquipmentId === equipment.id && (
+                                <tr>
+                                    <td colSpan="8" className="bg-gray-50 p-4">
+                                        {itemsLoading[equipment.id] ? (
+                                            <div className="flex justify-center items-center py-4">
+                                                <Loader2 size={24} className="animate-spin text-gray-600" />
+                                                <span className="ml-2 text-gray-600">{t('loading')}...</span>
+                                            </div>
+                                        ) : equipmentItems[equipment.id]?.length > 0 ? (
+                                            <div className="max-h-80 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                                                <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-2">
+                                                    {equipmentItems[equipment.id].map((item) => (
+                                                        <div
+                                                            key={`item-${item.id}`}
+                                                            className="p-4 bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-gray-100 transition-colors duration-200"
+                                                        >
+                                                            <div className="flex flex-col space-y-2">
+                                                                <div className="flex justify-between items-center">
+                                                                    <span className="text-sm font-medium text-gray-900">
+                                                                        {t('serialNumber')}: {item.serialNumber}
+                                                                    </span>
+                                                                    <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full border ${getStatusColor(item.status)}`}>
+                                                                        {getTranslatedStatus(item.status)}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="text-sm text-gray-600">
+                                                                    <span className="font-medium">{t('location')}:</span> {item.locationName || '-'}
+                                                                </div>
+                                                                {item.returnDate && (
+                                                                    <div className="text-sm text-gray-600">
+                                                                        <span className="font-medium">{t('returnDate')}:</span> {formatDate(item.returnDate)}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <p className="text-gray-600 text-center py-4">{t('noEquipments')}</p>
+                                        )}
+                                    </td>
+                                </tr>
+                            )}
+                        </Fragment>
                     ))}
                     </tbody>
                 </table>
-                {/* Phân trang nằm trong bảng, căn phải */}
+                {loading && equipmentData.length > 0 && (
+                    <div className="flex justify-center py-4">
+                        <Loader2 size={24} className="animate-spin text-gray-600" />
+                        <span className="ml-2 text-gray-600">{t('loading')}...</span>
+                    </div>
+                )}
                 <div className="flex justify-end items-center p-4">
                     <div className="flex gap-2">
                         <button

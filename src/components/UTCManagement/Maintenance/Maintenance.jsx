@@ -11,7 +11,7 @@ export default function Maintenance() {
     const { t } = useTranslation();
 
     const [maintenanceData, setMaintenanceData] = useState([]);
-    const [equipments, setEquipments] = useState([]);
+    const [equipmentItems, setEquipmentItems] = useState([]);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -64,15 +64,15 @@ export default function Maintenance() {
         }
     };
 
-    const fetchEquipments = async () => {
+    const fetchEquipmentItems = async () => {
         try {
-            const response = await fetch(`${BASE_URL}/equipment/get?page=0&size=100`, {
+            const response = await fetch(`${BASE_URL}/item/get?page=0&size=100`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
             if (!response.ok) throw new Error(t('fetchError'));
             const data = await response.json();
-            setEquipments(data.content || []);
+            setEquipmentItems(data.content || []);
         } catch (err) {
             console.error('Failed to fetch equipments:', err);
         }
@@ -88,7 +88,7 @@ export default function Maintenance() {
     }, [currentPage, searchTerm]);
 
     useEffect(() => {
-        fetchEquipments();
+        fetchEquipmentItems();
     }, []);
 
     const handleAddMaintenance = async () => {
@@ -253,7 +253,7 @@ export default function Maintenance() {
 
 
     const handleOpenEditModal = (maintenance) => {
-        const selectedEquipment = equipments.find(equip => equip.name === maintenance.equipmentName);
+        const selectedEquipment = equipmentItems.find(equip => equip.name === maintenance.equipmentName);
         setSelectedMaintenance({
             ...maintenance,
             equipmentId: selectedEquipment ? selectedEquipment.id : '',
@@ -384,7 +384,7 @@ export default function Maintenance() {
                 onSave={handleAddMaintenance}
                 newMaintenance={newMaintenanceData}
                 onInputChange={handleAddInputChange}
-                equipments={equipments}
+                equipments={equipmentItems}
             />
             <EditMaintenance
                 isOpen={isEditModalOpen}
@@ -392,7 +392,7 @@ export default function Maintenance() {
                 onSave={handleEditMaintenance}
                 maintenance={selectedMaintenance || {}}
                 onInputChange={handleEditInputChange}
-                equipments={equipments}
+                equipments={equipmentItems}
             />
             <DeleteMaintenance
                 isOpen={isDeleteModalOpen}

@@ -1,6 +1,6 @@
-import {useState, useEffect, Fragment} from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import SearchBar from '../Nav/SearchBar.jsx';
-import { Pencil, Trash2, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { Pencil, Trash2, Plus, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import AddLocation from './AddLocation.jsx';
 import EditLocation from './EditLocation.jsx';
 import DeleteLocation from './DeleteLocation.jsx';
@@ -10,7 +10,9 @@ export default function Location() {
     const { t } = useTranslation();
 
     const [locationData, setLocationData] = useState([]);
-    const [equipmentData, setEquipmentData] = useState([]);
+    const [equipmentItems, setEquipmentItems] = useState({});
+    const [equipmentCounts, setEquipmentCounts] = useState({});
+    const [itemsLoading, setItemsLoading] = useState({});
     const [isAddLocationModalOpen, setIsAddLocationModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -32,6 +34,7 @@ export default function Location() {
 
     const fetchLocationData = async (page = 0, search = '') => {
         try {
+            setLoading(true);
             const url = search
                 ? `${BASE_URL}/location/get?name=${encodeURIComponent(search)}&page=${page}&size=${pageSize}`
                 : `${BASE_URL}/location/get?page=${page}&size=${pageSize}`;
@@ -41,8 +44,34 @@ export default function Location() {
             });
             if (!response.ok) throw new Error(t('fetchError'));
             const data = await response.json();
-            setLocationData(data.content || []);
-            setTotalPages(data.page.totalPages || 1);
+            const locationList = data.content || [];
+
+            // Fetch equipment counts for each location
+            const counts = {};
+            await Promise.all(
+                locationList.map(async (location) => {
+                    try {
+                        const itemResponse = await fetch(`${BASE_URL}/item/get?locationId=${location.id}`, {
+                            method: 'GET',
+                            headers: { 'Content-Type': 'application/json' },
+                        });
+                        if (!itemResponse.ok) {
+                            console.error(`Failed to fetch items for location ${location.id}`);
+                            counts[location.id] = 0;
+                            return;
+                        }
+                        const items = await itemResponse.json();
+                        counts[location.id] = items.length;
+                    } catch (err) {
+                        console.error(`Error fetching items for location ${location.id}:`, err);
+                        counts[location.id] = 0;
+                    }
+                })
+            );
+
+            setLocationData(locationList);
+            setEquipmentCounts(counts);
+            setTotalPages(data.totalPages || 1);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -50,33 +79,41 @@ export default function Location() {
         }
     };
 
-    const fetchEquipmentData = async () => {
+    const fetchEquipmentItems = async (locationId) => {
         try {
-            const response = await fetch(`${BASE_URL}/equipment/get?page=0&size=1000`, {
+            setItemsLoading((prev) => ({ ...prev, [locationId]: true }));
+            const response = await fetch(`${BASE_URL}/item/get?locationId=${locationId}`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
             if (!response.ok) throw new Error(t('fetchError'));
             const data = await response.json();
-            setEquipmentData(data.content || []);
+            setEquipmentItems((prev) => ({
+                ...prev,
+                [locationId]: data || [],
+            }));
+            setEquipmentCounts((prev) => ({
+                ...prev,
+                [locationId]: data.length,
+            }));
         } catch (err) {
-            console.error('Failed to fetch equipment:', err);
+            console.error(`Failed to fetch equipment items for location ${locationId}:`, err);
+        } finally {
+            setItemsLoading((prev) => ({ ...prev, [locationId]: false }));
         }
     };
 
     const handleSearch = (term) => {
-        fetchLocationData(currentPage, term);
+        setSearchTerm(term);
+        setCurrentPage(0);
+        fetchLocationData(0, term);
     };
 
     useEffect(() => {
         setLoading(true);
-       fetchLocationData(currentPage, searchTerm);
+        fetchLocationData(currentPage, searchTerm);
     }, [currentPage, searchTerm]);
 
-    useEffect(() => {
-        fetchEquipmentData();
-        console.log("Equipment data-----------------------:", equipmentData);
-    }, [])
     const handleOpenAddLocationModal = () => {
         setIsAddLocationModalOpen(true);
     };
@@ -98,11 +135,11 @@ export default function Location() {
                 const errorText = await response.text();
                 throw new Error(t('addError') + ': ' + errorText);
             }
-            setNewLocationData({ locationName: '' });
+            setNewLocationData({ locationName: '', equipments: '' });
             setIsAddLocationModalOpen(false);
             fetchLocationData(currentPage, searchTerm);
         } catch (err) {
-            alert(err.message);
+            alert(t('err.message'));
         }
     };
 
@@ -132,7 +169,7 @@ export default function Location() {
             setSelectedLocation(null);
             fetchLocationData(currentPage, searchTerm);
         } catch (err) {
-            alert(err.message);
+            alert(t('err.message'));
         }
     };
 
@@ -155,7 +192,7 @@ export default function Location() {
             setLocationToDelete(null);
             fetchLocationData(currentPage, searchTerm);
         } catch (err) {
-            alert(err.message);
+            alert(t('err.message'));
         }
     };
 
@@ -174,16 +211,25 @@ export default function Location() {
             ...prev,
             [locationId]: !prev[locationId],
         }));
+        if (!expandedRows[locationId] && !equipmentItems[locationId]) {
+            fetchEquipmentItems(locationId);
+        }
     };
 
     function getStatusColor(status) {
         switch (status) {
             case 'Broken':
+            case 'BROKEN':
                 return 'bg-red-100 text-red-700 border-red-200';
             case 'Active':
+            case 'ACTIVE':
                 return 'bg-green-100 text-green-700 border-green-200';
             case 'Maintenance':
+            case 'MAINTENANCE':
                 return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+            case 'Borrowed':
+            case 'BORROWED':
+                return 'bg-blue-100 text-blue-700 border-blue-200';
             default:
                 return 'bg-gray-100 text-gray-700 border-gray-200';
         }
@@ -192,11 +238,17 @@ export default function Location() {
     const getTranslatedStatus = (status) => {
         switch (status) {
             case 'Active':
+            case 'ACTIVE':
                 return t('statusActive');
             case 'Broken':
+            case 'BROKEN':
                 return t('statusBroken');
             case 'Maintenance':
+            case 'MAINTENANCE':
                 return t('statusMaintenance');
+            case 'Borrowed':
+            case 'BORROWED':
+                return t('statusBorrowed');
             default:
                 return status;
         }
@@ -238,17 +290,22 @@ export default function Location() {
         return pageNumbers;
     };
 
-    const getEquipmentForLocation = (location) => {
-        let equipment;
-        if (location.equipment && Array.isArray(location.equipment)) {
-            equipment = location.equipment;
-        } else {
-            equipment = equipmentData.filter((equip) => equip.locationId === location.id);
-        }
-        return equipment.sort((a, b) => a.id - b.id);
-    };
-    if (loading) return <div className="min-h-screen p-6 min-w-full flex items-center justify-center"><p>{t('loading')}</p></div>;
-    if (error) return <div className="min-h-screen p-6 min-w-full flex items-center justify-center"><p className="text-red-600">{t('error')}: {error}</p></div>;
+    if (loading && locationData.length === 0) {
+        return (
+            <div className="min-h-screen p-6 min-w-full flex items-center justify-center">
+                <Loader2 size={24} className="animate-spin mr-2" />
+                <p>{t('loading')}</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="min-h-screen p-6 min-w-full flex items-center justify-center">
+                <p className="text-red-600">{t('error')}: {error}</p>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen p-6 min-w-full overflow-auto">
@@ -269,49 +326,53 @@ export default function Location() {
                 <table className="min-w-full table-fixed">
                     <thead className="bg-gray-200 text-gray-700">
                     <tr className="rounded-t-lg">
-                        <th className="py-4 px-6 text-left font-semibold w-[100px]">{t('id')}</th>
-                        <th className="py-4 px-6 text-left font-semibold">{t('locationName')}</th>
-                        <th className="py-4 px-6 text-left font-semibold w-[150px]">{t('equipment')}</th>
-                        <th className="py-4 px-6 font-semibold w-[150px]">{t('actions')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('id')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('locationName')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('equipment')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('actions')}</th>
                     </tr>
                     </thead>
                     <tbody>
-                    {locationData.map((location) => {
-                        const locationEquipment = getEquipmentForLocation(location);
-                        return (
-                            <Fragment key={location.id}>
-                                <tr className="border-t border-gray-200 hover:bg-gray-50">
-                                    <td className="py-4 px-6 text-gray-800 w-[100px]">{location.id}</td>
-                                    <td className="py-4 px-6 text-gray-800">{location.locationName}</td>
-                                    <td className="py-4 px-6 text-gray-800 w-[150px]">
+                    {locationData.map((location) => (
+                        <Fragment key={location.id}>
+                            <tr className="border-t border-gray-200 hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{location.id}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{location.locationName}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+                                    <button
+                                        onClick={() => toggleRowExpansion(location.id)}
+                                        className="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 font-medium rounded-md shadow-sm hover:bg-blue-100 hover:scale-105 active:scale-95 transition-all duration-200"
+                                    >
+                                        {equipmentCounts[location.id] !== undefined ? equipmentCounts[location.id] : 0} {t('equipments')}
+                                        {expandedRows[location.id] ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                    </button>
+                                </td>
+                                <td className="py-4 px-6 text-center w-[150px]">
+                                    <div className="flex space-x-3">
                                         <button
-                                            onClick={() => toggleRowExpansion(location.id)}
-                                            className="flex items-center gap-2 text-blue-700 hover:underline"
+                                            onClick={() => handleOpenEditModal(location)}
+                                            className="p-2 text-blue-700 font-bold rounded-md hover:bg-blue-600 hover:text-white transition duration-200 cursor-pointer"
                                         >
-                                            {locationEquipment.length} {t('equipments')}
-                                            {expandedRows[location.id] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                            <Pencil size={16} />
                                         </button>
-                                    </td>
-                                    <td className="py-4 px-6 text-center w-[150px]">
-                                        <div className="flex justify-center gap-3">
-                                            <button
-                                                onClick={() => handleOpenEditModal(location)}
-                                                className="p-2 text-blue-700 font-bold rounded-md hover:bg-blue-600 hover:text-white transition duration-200 cursor-pointer"
-                                            >
-                                                <Pencil size={16} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleOpenDeleteModal(location)}
-                                                className="px-2 py-1 text-red-700 font-bold rounded-md hover:bg-red-500 hover:text-white transition duration-200 cursor-pointer"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {expandedRows[location.id] && locationEquipment.length > 0 && (
-                                    <tr className="bg-gray-50">
-                                        <td colSpan="4" className="py-2 px-6">
+                                        <button
+                                            onClick={() => handleOpenDeleteModal(location)}
+                                            className="px-2 py-1 text-red-700 font-bold rounded-md hover:bg-red-500 hover:text-white transition duration-200 cursor-pointer"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {expandedRows[location.id] && (
+                                <tr className="bg-gray-50">
+                                    <td colSpan="4" className="py-2 px-6">
+                                        {itemsLoading[location.id] ? (
+                                            <div className="flex justify-center items-center py-4">
+                                                <Loader2 size={24} className="animate-spin text-gray-600" />
+                                                <span className="ml-2 text-gray-600">{t('loading')}...</span>
+                                            </div>
+                                        ) : equipmentItems[location.id]?.length > 0 ? (
                                             <table className="w-full table-fixed">
                                                 <thead>
                                                 <tr className="text-gray-600">
@@ -322,30 +383,39 @@ export default function Location() {
                                                 </tr>
                                                 </thead>
                                                 <tbody>
-                                                {locationEquipment.map((equip) => (
-                                                    <tr key={equip.id} className="border-t border-gray-200">
-                                                        <td className="py-2 px-4 w-[100px]">{equip.id}</td>
-                                                        <td className="py-2 px-4">{equip.name}</td>
+                                                {equipmentItems[location.id].map((item) => (
+                                                    <tr key={item.id} className="border-t border-gray-200">
+                                                        <td className="py-2 px-4 w-[100px]">{item.id}</td>
+                                                        <td className="py-2 px-4">{item.equipmentName || 'N/A'}</td>
                                                         <td className="py-2 px-4 w-[150px]">
-                        <span
-                            className={`inline-block px-3 py-1 text-sm font-medium rounded-full border ${getStatusColor(equip.status)}`}
-                        >
-                          {getTranslatedStatus(equip.status)}
-                        </span>
+                                                                    <span
+                                                                        className={`inline-block px-3 py-1 text-sm font-medium rounded-full border ${getStatusColor(
+                                                                            item.status
+                                                                        )}`}
+                                                                    >
+                                                                        {getTranslatedStatus(item.status)}
+                                                                    </span>
                                                         </td>
-                                                        <td className="py-2 px-4">{equip.description || 'N/A'}</td>
+                                                        <td className="py-2 px-4">{item.description || 'N/A'}</td>
                                                     </tr>
                                                 ))}
                                                 </tbody>
                                             </table>
-                                        </td>
-                                    </tr>
-                                )}
-                            </Fragment>
-                        );
-                    })}
+                                        ) : (
+                                            <p className="text-gray-600 text-center py-4">{t('noEquipment')}</p>
+                                        )}
+                                    </td>
+                                </tr>
+                            )}
+                        </Fragment>
+                    ))}
                     </tbody>
                 </table>
+                {!loading && !error && locationData.length === 0 && (
+                    <div className="flex justify-center items-center py-4">
+                        <p className="text-gray-600 text-center">{t('noLocations')}</p>
+                    </div>
+                )}
                 <div className="flex justify-end items-center p-4">
                     <div className="flex gap-2">
                         <button
