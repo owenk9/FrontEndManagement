@@ -1,14 +1,19 @@
 import { useTranslation } from 'react-i18next';
-import {useState} from "react";
+import {useEffect, useState} from "react";
 
 export default function SearchBar({ onSearch }) {
     const { t } = useTranslation();
     const [searchTerm, setSearchTerm] = useState('');
 
+    useEffect(() => {
+        console.log("rerender")
+    }, [])
     const handleSearch = (e) => {
         setSearchTerm(e.target.value);
         onSearch(e.target.value); // Gửi giá trị tìm kiếm lên parent component
+        console.log(e.target.value);
     };
+
 
     return (
         <div className="relative w-64">

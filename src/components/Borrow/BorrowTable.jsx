@@ -131,6 +131,20 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
         return () => debouncedFetchEquipmentData.cancel();
     }, [currentPage, debouncedFetchEquipmentData]);
 
+    // New useEffect to handle location filter changes
+    useEffect(() => {
+        // Clear equipmentItems when location filter changes
+        setEquipmentItems({});
+        // Refetch items for the currently expanded equipment, if any
+        if (expandedEquipmentId) {
+            fetchEquipmentItems(expandedEquipmentId);
+        }
+        // If the modal is open, refetch items for the selected equipment
+        if (isModalOpen && selectedEquipment) {
+            fetchEquipmentItems(selectedEquipment.id);
+        }
+    }, [filterParams.filterLocation, expandedEquipmentId, isModalOpen, selectedEquipment, fetchEquipmentItems]);
+
     useEffect(() => {
         const fetchInitialData = async () => {
             try {
@@ -169,9 +183,7 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
             setExpandedEquipmentId(null);
         } else {
             setExpandedEquipmentId(equipmentId);
-            if (!equipmentItems[equipmentId]) {
-                fetchEquipmentItems(equipmentId);
-            }
+            fetchEquipmentItems(equipmentId); // Always refetch items to ensure freshness
         }
     };
 
@@ -183,9 +195,7 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
             borrowDate: new Date().toISOString().slice(0, 16),
             note: '',
         });
-        if (!equipmentItems[equipment.id]) {
-            fetchEquipmentItems(equipment.id);
-        }
+        fetchEquipmentItems(equipment.id); // Always fetch fresh items when opening the modal
         setIsModalOpen(true);
     };
 

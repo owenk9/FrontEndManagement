@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-export default function AddEquipment({ isOpen, onClose, onSave, newEquipment, onInputChange, onImageChange, locations, categories }) {
+export default function AddEquipment({ isOpen, onClose, onSave, newEquipment, onInputChange, onImageChange, categories }) {
     const { t } = useTranslation();
 
     if (!isOpen) return null;
@@ -32,43 +32,6 @@ export default function AddEquipment({ isOpen, onClose, onSave, newEquipment, on
                     />
                 </div>
                 <div className="mb-4">
-                    <label className="block text-gray-700 font-semibold mb-1">{t('status')}</label>
-                    <select
-                        name="status"
-                        value={newEquipment.status}
-                        onChange={onInputChange}
-                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
-                    >
-                        <option value="Active">{t('statusActive')}</option>
-                        <option value="Broken">{t('statusBroken')}</option>
-                        <option value="Maintenance">{t('statusMaintenance')}</option>
-                    </select>
-                </div>
-                <div className="mb-4">
-                    <label className="block text-gray-700 font-semibold mb-1">{t('purchaseDate')}</label>
-                    <input
-                        type="datetime-local"
-                        name="purchaseDate"
-                        value={newEquipment.purchaseDate}
-                        onChange={onInputChange}
-                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
-                        required
-                    />
-                </div>
-                <div className="mb-4">
-                    <label className="block text-gray-700 font-semibold mb-1">{t('quantity')}</label>
-                    <input
-                        type="number"
-                        name="quantity"
-                        value={newEquipment.quantity}
-                        onChange={onInputChange}
-                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
-                        placeholder={t('enterQuantity')}
-                        min="1"
-                        required
-                    />
-                </div>
-                <div className="mb-4">
                     <label className="block text-gray-700 font-semibold mb-1">{t('category')}</label>
                     <select
                         name="categoryId"
@@ -81,23 +44,6 @@ export default function AddEquipment({ isOpen, onClose, onSave, newEquipment, on
                         {categories.map((category) => (
                             <option key={category.id} value={category.id}>
                                 {category.categoryName}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-                <div className="mb-4">
-                    <label className="block text-gray-700 font-semibold mb-1">{t('location')}</label>
-                    <select
-                        name="locationId"
-                        value={newEquipment.locationId}
-                        onChange={onInputChange}
-                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
-                        required
-                    >
-                        <option value="">{t('selectLocation')}</option>
-                        {locations.map((location) => (
-                            <option key={location.id} value={location.id}>
-                                {location.locationName}
                             </option>
                         ))}
                     </select>

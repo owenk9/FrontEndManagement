@@ -4,6 +4,9 @@ import { Pencil, Trash2, Plus, ChevronDown, ChevronUp, Loader2 } from 'lucide-re
 import AddEquipment from './AddEquipment.jsx';
 import EditEquipment from './EditEquipment.jsx';
 import DeleteEquipment from './DeleteEquipment.jsx';
+import AddEquipmentItem from './AddEquipmentItem.jsx';
+import EditEquipmentItem from './EditEquipmentItem.jsx';
+import DeleteEquipmentItem from './DeleteEquipmentItem.jsx';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 
@@ -17,24 +20,35 @@ export default function EquipmentList() {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
+    const [isEditItemModalOpen, setIsEditItemModalOpen] = useState(false);
+    const [isDeleteItemModalOpen, setIsDeleteItemModalOpen] = useState(false);
     const [newEquipmentData, setNewEquipmentData] = useState({
         name: '',
-        status: 'Active',
-        purchaseDate: '',
         description: '',
         quantity: '',
         categoryId: '',
-        locationId: '',
         image: null,
     });
     const [selectedEquipment, setSelectedEquipment] = useState(null);
     const [equipmentToDelete, setEquipmentToDelete] = useState(null);
+    const [selectedEquipmentForItem, setSelectedEquipmentForItem] = useState(null);
+    const [newEquipmentItemData, setNewEquipmentItemData] = useState({
+        serialNumber: '',
+        status: 'Active',
+        purchaseDate: '',
+        locationId: '',
+        returnDate: '',
+        equipmentId: '',
+    });
+    const [selectedEquipmentItem, setSelectedEquipmentItem] = useState(null);
+    const [equipmentItemToDelete, setEquipmentItemToDelete] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
     const [pageSize] = useState(4);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm] = useState('');
     const [expandedEquipmentId, setExpandedEquipmentId] = useState(null);
     const [equipmentItems, setEquipmentItems] = useState({});
     const [itemsLoading, setItemsLoading] = useState({});
@@ -53,10 +67,7 @@ export default function EquipmentList() {
             });
             if (!response.ok) throw new Error(t('fetchError'));
             const data = await response.json();
-
             const equipmentList = data.content || [];
-
-            // Fetch quantities for each equipment
             const quantities = {};
             await Promise.all(
                 equipmentList.map(async (equipment) => {
@@ -78,7 +89,6 @@ export default function EquipmentList() {
                     }
                 })
             );
-
             setEquipmentData(equipmentList);
             setEquipmentQuantities(quantities);
             setTotalPages(data.totalPages || 1);
@@ -90,6 +100,10 @@ export default function EquipmentList() {
     };
 
     const fetchEquipmentItems = async (equipmentId) => {
+        if (!equipmentId || isNaN(equipmentId)) {
+            console.error('Invalid equipmentId:', equipmentId);
+            return;
+        }
         try {
             setItemsLoading((prev) => ({ ...prev, [equipmentId]: true }));
             const response = await fetch(`${BASE_URL}/item/get?equipmentId=${equipmentId}`, {
@@ -98,6 +112,7 @@ export default function EquipmentList() {
             });
             if (!response.ok) throw new Error(t('fetchError'));
             const data = await response.json();
+            console.log('Fetched equipment items:', data); // Debug dữ liệu
             setEquipmentItems((prev) => ({ ...prev, [equipmentId]: data || [] }));
         } catch (err) {
             console.error('Failed to fetch equipment items:', err);
@@ -107,6 +122,10 @@ export default function EquipmentList() {
     };
 
     const toggleDropdown = (equipmentId) => {
+        if (!equipmentId || isNaN(equipmentId)) {
+            console.error('Invalid equipmentId for toggle:', equipmentId);
+            return;
+        }
         if (expandedEquipmentId === equipmentId) {
             setExpandedEquipmentId(null);
         } else {
@@ -146,9 +165,7 @@ export default function EquipmentList() {
     };
 
     const handleSearch = (term) => {
-        setSearchTerm(term);
-        setCurrentPage(0);
-        fetchEquipmentData(0, term);
+        fetchEquipmentData(currentPage, term);
     };
 
     useEffect(() => {
@@ -162,10 +179,6 @@ export default function EquipmentList() {
     }, []);
 
     const handleAddEquipment = async () => {
-        if (!newEquipmentData.name || !newEquipmentData.purchaseDate || !newEquipmentData.quantity || !newEquipmentData.categoryId || !newEquipmentData.locationId) {
-            alert(t('fillRequiredEquipmentFields'));
-            return;
-        }
         try {
             const formData = new FormData();
             const equipmentData = {
@@ -173,9 +186,9 @@ export default function EquipmentList() {
                 status: newEquipmentData.status,
                 purchaseDate: newEquipmentData.purchaseDate,
                 description: newEquipmentData.description,
-                quantity: parseInt(newEquipmentData.quantity),
-                categoryId: parseInt(newEquipmentData.categoryId),
-                locationId: parseInt(newEquipmentData.locationId),
+                quantity: parseInt(newEquipmentData.quantity) || 0,
+                categoryId: parseInt(newEquipmentData.categoryId) || 0,
+                locationId: parseInt(newEquipmentData.locationId) || 0,
             };
             const equipmentBlob = new Blob([JSON.stringify(equipmentData)], { type: 'application/json' });
             formData.append('equipment', equipmentBlob);
@@ -188,7 +201,7 @@ export default function EquipmentList() {
 
             if (!response.ok) {
                 const errorText = await response.text();
-                throw new Error(t('addError') + errorText);
+                throw new Error(t('addError') + ': ' + errorText);
             }
 
             setNewEquipmentData({
@@ -205,7 +218,125 @@ export default function EquipmentList() {
             fetchEquipmentData(currentPage, searchTerm);
         } catch (err) {
             console.error('Failed to add equipment:', err);
-            alert(t('err.message'));
+            alert(err.message);
+        }
+    };
+
+    const handleAddEquipmentItem = async () => {
+        try {
+            const itemData = {
+                serialNumber: newEquipmentItemData.serialNumber,
+                status: newEquipmentItemData.status,
+                locationId: parseInt(newEquipmentItemData.locationId) || 0,
+                returnDate: newEquipmentItemData.returnDate || null,
+                equipmentId: parseInt(newEquipmentItemData.equipmentId),
+            };
+
+            const response = await fetch(`${BASE_URL}/item/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(itemData),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(t('addItemError') + ': ' + errorText);
+            }
+
+            setNewEquipmentItemData({
+                serialNumber: '',
+                status: 'Active',
+                locationId: '',
+                returnDate: '',
+                equipmentId: '',
+            });
+            setIsAddItemModalOpen(false);
+            setSelectedEquipmentForItem(null);
+            fetchEquipmentItems(newEquipmentItemData.equipmentId);
+            fetchEquipmentData(currentPage, searchTerm);
+            // Đảm bảo danh sách item hiển thị ngay sau khi thêm
+            if (expandedEquipmentId === newEquipmentItemData.equipmentId) {
+                fetchEquipmentItems(newEquipmentItemData.equipmentId);
+            }
+        } catch (err) {
+            console.error('Failed to add equipment item:', err);
+            alert(err.message);
+        }
+    };
+
+    const handleEditEquipmentItem = async () => {
+        if (!selectedEquipmentItem || !selectedEquipmentItem.serialNumber) {
+            alert(t('serialNumberRequired'));
+            return;
+        }
+        try {
+            console.log('Sending update for equipment item:', selectedEquipmentItem); // Debug dữ liệu gửi đi
+            const itemData = {
+                serialNumber: selectedEquipmentItem.serialNumber,
+                status: selectedEquipmentItem.status || 'Active',
+                locationId: parseInt(selectedEquipmentItem.locationId) || 0,
+                returnDate: selectedEquipmentItem.returnDate || null,
+                equipmentId: parseInt(selectedEquipmentItem.equipmentId),
+            };
+
+            const response = await fetch(`${BASE_URL}/item/update/${selectedEquipmentItem.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(itemData),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Update failed with status:', response.status, 'Response:', errorText);
+                throw new Error(t('updateItemError') + ': ' + errorText);
+            }
+
+            const updatedItem = await response.json(); // Lấy dữ liệu cập nhật từ server
+            console.log('Updated equipment item from server:', updatedItem); // Debug dữ liệu trả về
+            setIsEditItemModalOpen(false);
+
+            // Cập nhật danh sách equipmentItems ngay lập tức
+            if (selectedEquipmentItem.equipmentId) {
+                // Làm mới danh sách item
+                await fetchEquipmentItems(selectedEquipmentItem.equipmentId);
+
+                // Đảm bảo dropdown vẫn mở để hiển thị dữ liệu mới
+                if (expandedEquipmentId !== selectedEquipmentItem.equipmentId) {
+                    setExpandedEquipmentId(selectedEquipmentItem.equipmentId);
+                }
+            }
+
+            setSelectedEquipmentItem(null);
+        } catch (err) {
+            console.error('Failed to update equipment item:', err);
+            alert(err.message);
+        }
+    };
+
+    const handleDeleteEquipmentItem = async () => {
+        try {
+            const response = await fetch(`${BASE_URL}/item/delete/${equipmentItemToDelete.id}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            if (!response.ok) throw new Error(t('deleteItemError'));
+            setIsDeleteItemModalOpen(false);
+
+            // Làm mới danh sách item sau khi xóa
+            if (equipmentItemToDelete.equipmentId) {
+                await fetchEquipmentItems(equipmentItemToDelete.equipmentId);
+
+                // Đảm bảo dropdown vẫn mở để hiển thị dữ liệu mới
+                if (expandedEquipmentId !== equipmentItemToDelete.equipmentId) {
+                    setExpandedEquipmentId(equipmentItemToDelete.equipmentId);
+                }
+            }
+
+            setEquipmentItemToDelete(null);
+            fetchEquipmentData(currentPage, searchTerm);
+        } catch (err) {
+            console.error('Failed to delete equipment item:', err);
+            alert(err.message);
         }
     };
 
@@ -244,12 +375,12 @@ export default function EquipmentList() {
             setSelectedEquipment(null);
             fetchEquipmentData(currentPage, searchTerm);
 
-            // Refresh items if the expanded equipment is being edited
             if (expandedEquipmentId === selectedEquipment.id) {
                 fetchEquipmentItems(selectedEquipment.id);
             }
         } catch (err) {
-            alert(t('err.message'));
+            console.error('Failed to update equipment:', err);
+            alert(err.message);
         }
     };
 
@@ -265,22 +396,18 @@ export default function EquipmentList() {
             fetchEquipmentData(currentPage, searchTerm);
         } catch (err) {
             console.error(err);
-            alert(t('err.message'));
+            alert(err.message);
         }
     };
 
     function getStatusColor(status) {
         switch (status) {
-            case 'Broken':
             case 'BROKEN':
                 return 'bg-red-100 text-red-700 border-red-200';
-            case 'Active':
             case 'ACTIVE':
                 return 'bg-green-100 text-green-700 border-green-200';
-            case 'Maintenance':
             case 'MAINTENANCE':
                 return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-            case 'Borrowed':
             case 'BORROWED':
                 return 'bg-blue-100 text-blue-700 border-blue-200';
             default:
@@ -290,16 +417,12 @@ export default function EquipmentList() {
 
     const getTranslatedStatus = (status) => {
         switch (status) {
-            case 'Active':
             case 'ACTIVE':
                 return t('statusActive');
-            case 'Broken':
             case 'BROKEN':
                 return t('statusBroken');
-            case 'Maintenance':
             case 'MAINTENANCE':
                 return t('statusMaintenance');
-            case 'Borrowed':
             case 'BORROWED':
                 return t('statusBorrowed');
             default:
@@ -354,8 +477,8 @@ export default function EquipmentList() {
 
     const handleOpenAddModal = () => setIsAddModalOpen(true);
     const handleOpenEditModal = (equipment) => {
-        const selectedCategory = categories.find(cat => cat.categoryName === equipment.categoryName);
-        const selectedLocation = locations.find(loc => loc.locationName === equipment.locationName);
+        const selectedCategory = categories.find((cat) => cat.categoryName === equipment.categoryName);
+        const selectedLocation = locations.find((loc) => loc.locationName === equipment.locationName);
 
         setSelectedEquipment({
             ...equipment,
@@ -369,6 +492,31 @@ export default function EquipmentList() {
         setEquipmentToDelete(equipment);
         setIsDeleteModalOpen(true);
     };
+    const handleOpenAddItemModal = (equipment) => {
+        setSelectedEquipmentForItem(equipment);
+        setNewEquipmentItemData({
+            serialNumber: '',
+            status: 'ACTIVE',
+            locationId: '',
+            returnDate: '',
+            equipmentId: equipment.id,
+        });
+        setIsAddItemModalOpen(true);
+    };
+    const handleOpenEditItemModal = (item) => {
+        const selectedLocation = locations.find((loc) => loc.locationName === item.locationName);
+        setSelectedEquipmentItem({
+            ...item,
+            locationId: selectedLocation ? selectedLocation.id : item.locationId || '',
+            returnDate: item.returnDate || '',
+            equipmentId: item.equipmentId,
+        });
+        setIsEditItemModalOpen(true);
+    };
+    const handleOpenDeleteItemModal = (item) => {
+        setEquipmentItemToDelete(item);
+        setIsDeleteItemModalOpen(true);
+    };
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setNewEquipmentData((prev) => ({ ...prev, [name]: value }));
@@ -376,6 +524,18 @@ export default function EquipmentList() {
     const handleEditInputChange = (e) => {
         const { name, value } = e.target;
         setSelectedEquipment((prev) => ({ ...prev, [name]: value }));
+    };
+    const handleItemInputChange = (e) => {
+        const { name, value } = e.target;
+        setNewEquipmentItemData((prev) => ({ ...prev, [name]: value }));
+    };
+    const handleEditItemInputChange = (e) => {
+        const { name, value } = e.target;
+        setSelectedEquipmentItem((prev) => ({
+            ...prev,
+            [name]: value,
+        }));
+        console.log('Updated selectedEquipmentItem:', { ...selectedEquipmentItem, [name]: value }); // Debug cập nhật
     };
     const handleImageChange = (e) => {
         setNewEquipmentData((prev) => ({ ...prev, image: e.target.files[0] }));
@@ -413,7 +573,7 @@ export default function EquipmentList() {
                 <h1 className="text-3xl font-bold text-gray-900">{t('equipments')}</h1>
             </div>
             <div className="mb-6 flex justify-between items-center">
-                <SearchBar onSearch={handleSearch} value={searchTerm} />
+                <SearchBar onSearch={handleSearch} />
                 <button
                     className="flex items-center gap-2 bg-black text-white py-2 px-4 rounded-md hover:bg-gray-700 transition duration-200"
                     onClick={handleOpenAddModal}
@@ -431,7 +591,6 @@ export default function EquipmentList() {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('image')}</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('quantity')}</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('category')}</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('purchaseDate')}</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('description')}</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('actions')}</th>
                     </tr>
@@ -471,7 +630,6 @@ export default function EquipmentList() {
                                     {equipmentQuantities[equipment.id] !== undefined ? equipmentQuantities[equipment.id] : '-'}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{equipment.categoryName}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{formatDate(equipment.purchaseDate)}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{equipment.description || '-'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <div className="flex space-x-3">
@@ -487,12 +645,18 @@ export default function EquipmentList() {
                                         >
                                             <Trash2 size={16} />
                                         </button>
+                                        <button
+                                            className="p-2 text-green-700 rounded-md hover:bg-green-100 transition duration-200"
+                                            onClick={() => handleOpenAddItemModal(equipment)}
+                                        >
+                                            <Plus size={16} />
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
                             {expandedEquipmentId === equipment.id && (
                                 <tr>
-                                    <td colSpan="8" className="bg-gray-50 p-4">
+                                    <td colSpan="7" className="bg-gray-50 p-4">
                                         {itemsLoading[equipment.id] ? (
                                             <div className="flex justify-center items-center py-4">
                                                 <Loader2 size={24} className="animate-spin text-gray-600" />
@@ -509,11 +673,28 @@ export default function EquipmentList() {
                                                             <div className="flex flex-col space-y-2">
                                                                 <div className="flex justify-between items-center">
                                                                     <span className="text-sm font-medium text-gray-900">
-                                                                        {t('serialNumber')}: {item.serialNumber}
+                                                                        {t('serialNumber')}: {item.serialNumber || '-'}
                                                                     </span>
-                                                                    <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full border ${getStatusColor(item.status)}`}>
-                                                                        {getTranslatedStatus(item.status)}
-                                                                    </span>
+                                                                    <div className="flex space-x-2">
+                                                                        <button
+                                                                            className="p-1 text-blue-700 rounded-md hover:bg-blue-100 transition duration-200"
+                                                                            onClick={() => handleOpenEditItemModal(item)}
+                                                                        >
+                                                                            <Pencil size={14} />
+                                                                        </button>
+                                                                        <button
+                                                                            className="p-1 text-red-700 rounded-md hover:bg-red-100 transition duration-200"
+                                                                            onClick={() => handleOpenDeleteItemModal(item)}
+                                                                        >
+                                                                            <Trash2 size={14} />
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                                <span className={`inline-block px-1 py-1 text-xs font-medium rounded-full border min-w-fit ${getStatusColor(item.status)}`}>
+                                                                    {getTranslatedStatus(item.status) || '-'}
+                                                                </span>
+                                                                <div className="text-sm text-gray-600">
+                                                                    <span className="font-medium">{t('purchaseDate')}:</span> {formatDate(item.purchaseDate) || '-'}
                                                                 </div>
                                                                 <div className="text-sm text-gray-600">
                                                                     <span className="font-medium">{t('location')}:</span> {item.locationName || '-'}
@@ -529,7 +710,7 @@ export default function EquipmentList() {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <p className="text-gray-600 text-center py-4">{t('noEquipments')}</p>
+                                            <p className="text-gray-600 text-center py-4">{t('noItems')}</p>
                                         )}
                                     </td>
                                 </tr>
@@ -593,6 +774,29 @@ export default function EquipmentList() {
                 onClose={() => setIsDeleteModalOpen(false)}
                 onConfirm={handleDeleteEquipment}
                 equipmentName={equipmentToDelete?.name || ''}
+            />
+            <AddEquipmentItem
+                isOpen={isAddItemModalOpen}
+                onClose={() => setIsAddItemModalOpen(false)}
+                onSave={handleAddEquipmentItem}
+                newEquipmentItem={newEquipmentItemData}
+                onInputChange={handleItemInputChange}
+                locations={locations}
+                equipmentName={selectedEquipmentForItem?.name || ''}
+            />
+            <EditEquipmentItem
+                isOpen={isEditItemModalOpen}
+                onClose={() => setIsEditItemModalOpen(false)}
+                onSave={handleEditEquipmentItem}
+                equipmentItem={selectedEquipmentItem || {}}
+                onInputChange={handleEditItemInputChange}
+                locations={locations}
+            />
+            <DeleteEquipmentItem
+                isOpen={isDeleteItemModalOpen}
+                onClose={() => setIsDeleteItemModalOpen(false)}
+                onConfirm={handleDeleteEquipmentItem}
+                serialNumber={equipmentItemToDelete?.serialNumber || ''}
             />
         </div>
     );

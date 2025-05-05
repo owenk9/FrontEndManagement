@@ -55,9 +55,10 @@ i18n
 
                     //  AddEquipment
                     addNewEquipment: 'Add New Equipment',
-                    statusActive: 'Active',
-                    statusMaintenance: 'Maintenance',
-                    statusBroken: 'Broken',
+                    statusActive: 'ACTIVE',
+                    statusMaintenance: 'MAINTENANCE',
+                    statusBroken: 'BROKEN',
+                    statusBorrow: 'BORROW',
                     purchaseDate: 'Purchase Date',
                     enterEquipmentName: 'Enter equipment name',
                     quantity: 'Quantity',
@@ -118,10 +119,12 @@ i18n
 
                     // Maintenance
                     statusPending: 'Pending',
-                    statusInProgress: 'In Progress',
+                    statusInProgress: 'IN PROGRESS',
                     statusWaitingForParts: 'Waiting for Parts',
-                    statusCompleted: 'Completed',
-                    statusCanceled: 'Canceled',
+                    statusCompleted: 'COMPLETED',
+                    statusCanceled: 'CANCELED',
+                    statusScheduled: "SCHEDULED",
+                    statusFailed: "FAILED",
 
                     // EditMaintenanceModal
                     editMaintenance: 'Edit Maintenance',
@@ -181,7 +184,7 @@ i18n
                     all: 'All',
                     clearFilters: 'Clear filters',
                     confirm: 'Confirm',
-                    statusBorrowed: 'Borrowed',
+                    statusBorrowed: 'BORROWED',
                     borrowEquipment: 'Borrow equipment',
                     borrowConfirm: 'Borrow confirm',
                     bookLaterEquipment: 'Book later equipment',
@@ -270,6 +273,7 @@ i18n
                     maintenanceDate: 'Ngày bảo trì',
                     cost: 'Giá',
                     technician: 'Thợ bảo trì',
+
 
                     //  Location
                     locations: 'Vị trí',

@@ -56,11 +56,10 @@ export default function AddMaintenance({ isOpen, onClose, onSave, newMaintenance
                         onChange={onInputChange}
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
                     >
-                        <option value="Pending">{t('statusPending')}</option>
-                        <option value="In Progress">{t('statusInProgress')}</option>
-                        <option value="Waiting for Parts">{t('statusWaitingForParts')}</option>
-                        <option value="Completed">{t('statusCompleted')}</option>
-                        <option value="Canceled">{t('statusCanceled')}</option>
+                        <option value="SCHEDULED">{t('statusScheduled')}</option>
+                        <option value="INPROGRESS">{t('statusInProgress')}</option>
+                        <option value="COMPLETED">{t('statusCompleted')}</option>
+                        <option value="FAILED">{t('statusFailed')}</option>
                     </select>
                 </div>
                 <div className="mb-4">

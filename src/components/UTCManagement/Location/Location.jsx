@@ -5,6 +5,7 @@ import AddLocation from './AddLocation.jsx';
 import EditLocation from './EditLocation.jsx';
 import DeleteLocation from './DeleteLocation.jsx';
 import { useTranslation } from 'react-i18next';
+import { format } from 'date-fns';
 
 export default function Location() {
     const { t } = useTranslation();
@@ -28,7 +29,7 @@ export default function Location() {
     const [totalPages, setTotalPages] = useState(1);
     const [pageSize] = useState(10);
     const [searchTerm, setSearchTerm] = useState('');
-    const [expandedRows, setExpandedRows] = useState({});
+    const [expandedLocationId, setExpandedLocationId] = useState(null);
 
     const BASE_URL = 'http://localhost:9090';
 
@@ -71,7 +72,7 @@ export default function Location() {
 
             setLocationData(locationList);
             setEquipmentCounts(counts);
-            setTotalPages(data.totalPages || 1);
+            setTotalPages(data.page.totalPages || 1);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -207,12 +208,13 @@ export default function Location() {
     };
 
     const toggleRowExpansion = (locationId) => {
-        setExpandedRows((prev) => ({
-            ...prev,
-            [locationId]: !prev[locationId],
-        }));
-        if (!expandedRows[locationId] && !equipmentItems[locationId]) {
-            fetchEquipmentItems(locationId);
+        if (expandedLocationId === locationId) {
+            setExpandedLocationId(null);
+        } else {
+            setExpandedLocationId(locationId);
+            if (!equipmentItems[locationId]) {
+                fetchEquipmentItems(locationId);
+            }
         }
     };
 
@@ -251,6 +253,15 @@ export default function Location() {
                 return t('statusBorrowed');
             default:
                 return status;
+        }
+    };
+
+    const formatDate = (date) => {
+        if (!date) return '-';
+        try {
+            return format(new Date(date), 'dd/MM/yyyy HH:mm');
+        } catch {
+            return '-';
         }
     };
 
@@ -332,10 +343,10 @@ export default function Location() {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('actions')}</th>
                     </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-gray-200">
                     {locationData.map((location) => (
                         <Fragment key={location.id}>
-                            <tr className="border-t border-gray-200 hover:bg-gray-50">
+                            <tr className="hover:bg-gray-50">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{location.id}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{location.locationName}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
@@ -344,7 +355,7 @@ export default function Location() {
                                         className="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 font-medium rounded-md shadow-sm hover:bg-blue-100 hover:scale-105 active:scale-95 transition-all duration-200"
                                     >
                                         {equipmentCounts[location.id] !== undefined ? equipmentCounts[location.id] : 0} {t('equipments')}
-                                        {expandedRows[location.id] ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                        {expandedLocationId === location.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                                     </button>
                                 </td>
                                 <td className="py-4 px-6 text-center w-[150px]">
@@ -364,43 +375,50 @@ export default function Location() {
                                     </div>
                                 </td>
                             </tr>
-                            {expandedRows[location.id] && (
+                            {expandedLocationId === location.id && (
                                 <tr className="bg-gray-50">
-                                    <td colSpan="4" className="py-2 px-6">
+                                    <td colSpan="8" className="p-4">
                                         {itemsLoading[location.id] ? (
                                             <div className="flex justify-center items-center py-4">
                                                 <Loader2 size={24} className="animate-spin text-gray-600" />
                                                 <span className="ml-2 text-gray-600">{t('loading')}...</span>
                                             </div>
                                         ) : equipmentItems[location.id]?.length > 0 ? (
-                                            <table className="w-full table-fixed">
-                                                <thead>
-                                                <tr className="text-gray-600">
-                                                    <th className="py-2 px-4 text-left w-[100px]">{t('id')}</th>
-                                                    <th className="py-2 px-4 text-left">{t('equipmentName')}</th>
-                                                    <th className="py-2 px-4 text-left w-[150px]">{t('status')}</th>
-                                                    <th className="py-2 px-4 text-left">{t('description')}</th>
-                                                </tr>
-                                                </thead>
-                                                <tbody>
-                                                {equipmentItems[location.id].map((item) => (
-                                                    <tr key={item.id} className="border-t border-gray-200">
-                                                        <td className="py-2 px-4 w-[100px]">{item.id}</td>
-                                                        <td className="py-2 px-4">{item.equipmentName || 'N/A'}</td>
-                                                        <td className="py-2 px-4 w-[150px]">
+                                            <div className="max-h-80 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                                                <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-2">
+                                                    {equipmentItems[location.id].map((item, index) => (
+                                                        <div
+                                                            key={`item-${item.id}`}
+                                                            className={`p-4 bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-gray-100 transition-colors duration-200 ${
+                                                                index < equipmentItems[location.id].length - 1 ? 'border-b border-gray-200' : ''
+                                                            }`}
+                                                        >
+                                                            <div className="flex flex-col space-y-2">
+                                                                <div className="flex justify-between items-center">
+                                                                    <span className="text-sm font-medium text-gray-900">
+                                                                        {t('serialNumber')}: {item.serialNumber}
+                                                                    </span>
                                                                     <span
-                                                                        className={`inline-block px-3 py-1 text-sm font-medium rounded-full border ${getStatusColor(
+                                                                        className={`inline-block px-3 py-1 text-xs font-medium rounded-full border ${getStatusColor(
                                                                             item.status
                                                                         )}`}
                                                                     >
                                                                         {getTranslatedStatus(item.status)}
                                                                     </span>
-                                                        </td>
-                                                        <td className="py-2 px-4">{item.description || 'N/A'}</td>
-                                                    </tr>
-                                                ))}
-                                                </tbody>
-                                            </table>
+                                                                </div>
+                                                                <div className="text-sm text-gray-600">
+                                                                    <span className="font-medium">{t('location')}:</span> {item.locationName || '-'}
+                                                                </div>
+                                                                {item.returnDate && (
+                                                                    <div className="text-sm text-gray-600">
+                                                                        <span className="font-medium">{t('returnDate')}:</span> {formatDate(item.returnDate)}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
                                         ) : (
                                             <p className="text-gray-600 text-center py-4">{t('noEquipment')}</p>
                                         )}

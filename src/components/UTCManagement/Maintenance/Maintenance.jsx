@@ -16,10 +16,10 @@ export default function Maintenance() {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [newMaintenanceData, setNewMaintenanceData] = useState({
-        equipmentId: '',
+        equipmentItemId: '',
         maintenanceDate: '',
         description: '',
-        status: 'Pending',
+        status: 'SCHEDULED',
         cost: '',
         technician: '',
     });
@@ -30,7 +30,7 @@ export default function Maintenance() {
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
     const [pageSize] = useState(10);
-    const [searchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
 
     const BASE_URL = 'http://localhost:9090';
 
@@ -46,17 +46,41 @@ export default function Maintenance() {
 
     const fetchMaintenanceData = async (page = 0, search = '') => {
         try {
-            const url = search
-                ? `${BASE_URL}/maintenance/get?name=${encodeURIComponent(search)}&page=${page}&size=${pageSize}`
-                : `${BASE_URL}/maintenance/get?page=${page}&size=${pageSize}`;
+            setLoading(true);
+            let url = `${BASE_URL}/maintenance/get?page=${page}&size=${pageSize}`;
+            if (search) url += `&name=${encodeURIComponent(search)}`;
             const response = await fetch(url, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
             if (!response.ok) throw new Error(t('fetchError'));
             const data = await response.json();
-            setMaintenanceData(data.content || []);
-            setTotalPages(data.page.totalPages || 1);
+            const maintenanceList = data.content || [];
+
+            // Fetch equipment items to map equipment names and serial numbers
+            const itemResponse = await fetch(`${BASE_URL}/item/get?page=0&size=100`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            if (!itemResponse.ok) throw new Error(t('fetchError'));
+            const itemsData = await itemResponse.json();
+            const itemsContent = itemsData.content || itemsData; // Fallback if content is missing
+            const itemsMap = Array.isArray(itemsContent) ? itemsContent.reduce((map, item) => {
+                map[item.id] = item;
+                return map;
+            }, {}) : {};
+
+            const enrichedMaintenance = maintenanceList.map(maintenance => {
+                const equipmentItem = itemsMap[maintenance.equipmentItemId] || {};
+                return {
+                    ...maintenance,
+                    equipmentName: equipmentItem.equipmentName || 'N/A', // Use equipmentName directly
+                    serialNumber: equipmentItem.serialNumber || 'N/A',
+                };
+            });
+
+            setMaintenanceData(enrichedMaintenance);
+            setTotalPages(data.totalPages || 1);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -72,14 +96,14 @@ export default function Maintenance() {
             });
             if (!response.ok) throw new Error(t('fetchError'));
             const data = await response.json();
-            setEquipmentItems(data.content || []);
+            setEquipmentItems(data.content || data || []);
         } catch (err) {
-            console.error('Failed to fetch equipments:', err);
+            console.error('Failed to fetch equipment items:', err);
         }
     };
 
     const handleSearch = (term) => {
-        fetchMaintenanceData(currentPage, term);
+        setSearchTerm(term);
     };
 
     useEffect(() => {
@@ -92,7 +116,7 @@ export default function Maintenance() {
     }, []);
 
     const handleAddMaintenance = async () => {
-        if (!newMaintenanceData.equipmentId || !newMaintenanceData.maintenanceDate || !newMaintenanceData.cost || !newMaintenanceData.technician) {
+        if (!newMaintenanceData.equipmentItemId || !newMaintenanceData.maintenanceDate || !newMaintenanceData.cost || !newMaintenanceData.technician) {
             alert(t('fillRequiredMaintenanceFields'));
             return;
         }
@@ -101,7 +125,7 @@ export default function Maintenance() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    equipmentId: parseInt(newMaintenanceData.equipmentId),
+                    equipmentItemId: parseInt(newMaintenanceData.equipmentItemId),
                     maintenanceDate: newMaintenanceData.maintenanceDate,
                     description: newMaintenanceData.description,
                     status: newMaintenanceData.status,
@@ -114,10 +138,10 @@ export default function Maintenance() {
                 throw new Error(t('addError') + ': ' + errorText);
             }
             setNewMaintenanceData({
-                equipmentId: '',
+                equipmentItemId: '',
                 maintenanceDate: '',
                 description: '',
-                status: 'Pending',
+                status: 'SCHEDULED',
                 cost: '',
                 technician: '',
             });
@@ -129,7 +153,7 @@ export default function Maintenance() {
     };
 
     const handleEditMaintenance = async () => {
-        if (!selectedMaintenance.equipmentId || !selectedMaintenance.maintenanceDate || !selectedMaintenance.cost || !selectedMaintenance.technician) {
+        if (!selectedMaintenance.equipmentItemId || !selectedMaintenance.maintenanceDate || !selectedMaintenance.cost || !selectedMaintenance.technician) {
             alert(t('fillRequiredMaintenanceFields'));
             return;
         }
@@ -138,10 +162,10 @@ export default function Maintenance() {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    equipmentId: parseInt(selectedMaintenance.equipmentId),
+                    equipmentItemId: parseInt(selectedMaintenance.equipmentItemId),
                     maintenanceDate: selectedMaintenance.maintenanceDate,
                     description: selectedMaintenance.description || '',
-                    status: selectedMaintenance.status || 'Pending',
+                    status: selectedMaintenance.status,
                     cost: parseFloat(selectedMaintenance.cost),
                     technician: selectedMaintenance.technician,
                 }),
@@ -178,15 +202,13 @@ export default function Maintenance() {
 
     function getStatusColor(status) {
         switch (status) {
-            case 'Pending':
+            case 'SCHEDULED':
                 return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-            case 'In Progress':
+            case 'IN_PROGRESS':
                 return 'bg-blue-100 text-blue-800 border-blue-200';
-            case 'Waiting for Parts':
-                return 'bg-orange-100 text-orange-800 border-orange-200';
-            case 'Completed':
+            case 'COMPLETED':
                 return 'bg-green-100 text-green-800 border-green-200';
-            case 'Canceled':
+            case 'FAILED':
                 return 'bg-red-100 text-red-800 border-red-200';
             default:
                 return 'bg-gray-100 text-gray-700 border-gray-200';
@@ -195,20 +217,18 @@ export default function Maintenance() {
 
     const getTranslatedStatus = (status) => {
         switch (status) {
-            case 'Pending':
-                return t('statusPending');
-            case 'In Progress':
+            case 'SCHEDULED':
+                return t('statusScheduled');
+            case 'IN_PROGRESS':
                 return t('statusInProgress');
-            case 'Waiting for Parts':
-                return t('statusWaitingForParts');
-            case 'Completed':
+            case 'COMPLETED':
                 return t('statusCompleted');
-            case 'Canceled':
-                return t('statusCanceled');
+            case 'FAILED':
+                return t('statusFailed');
             default:
                 return status;
         }
-    };
+    }
 
     const handlePageChange = (page) => {
         if (page >= 0 && page < totalPages && page !== currentPage) {
@@ -242,42 +262,31 @@ export default function Maintenance() {
                 </button>
             );
         }
-
         return pageNumbers;
     };
 
-    const handleOpenAddModal = () => {
-        setIsAddModalOpen(true);
-    };
-
-
-
+    const handleOpenAddModal = () => setIsAddModalOpen(true);
     const handleOpenEditModal = (maintenance) => {
-        const selectedEquipment = equipmentItems.find(equip => equip.name === maintenance.equipmentName);
+        const equipmentItem = equipmentItems.find(item => item.id === maintenance.equipmentItemId);
         setSelectedMaintenance({
             ...maintenance,
-            equipmentId: selectedEquipment ? selectedEquipment.id : '',
+            equipmentItemId: maintenance.equipmentItemId,
+            equipmentName: equipmentItem?.equipmentName || 'N/A', // Use equipmentName directly
         });
         setIsEditModalOpen(true);
     };
-
-
-
     const handleOpenDeleteModal = (maintenance) => {
         setMaintenanceToDelete(maintenance);
         setIsDeleteModalOpen(true);
     };
-
     const handleAddInputChange = (e) => {
         const { name, value } = e.target;
         setNewMaintenanceData((prev) => ({ ...prev, [name]: value }));
     };
-
     const handleEditInputChange = (e) => {
         const { name, value } = e.target;
         setSelectedMaintenance((prev) => ({ ...prev, [name]: value }));
     };
-
 
     if (loading) return <div className="min-h-screen p-6 min-w-full flex items-center justify-center"><p>{t('loading')}</p></div>;
     if (error) return <div className="min-h-screen p-6 min-w-full flex items-center justify-center"><p className="text-red-600">{t('error')}: {error}</p></div>;
@@ -301,39 +310,41 @@ export default function Maintenance() {
                 <table className="min-w-full table-fixed">
                     <thead className="bg-gray-200 text-gray-700">
                     <tr>
-                        <th className="py-4 px-6 text-left font-semibold">{t('id')}</th>
-                        <th className="py-4 px-6 text-left font-semibold">{t('equipmentName')}</th>
-                        <th className="py-4 px-6 text-left font-semibold">{t('maintenanceDate')}</th>
-                        <th className="py-4 px-6 text-left font-semibold w-80">{t('description')}</th>
-                        <th className="py-4 px-6 text-left font-semibold w-[150px]">{t('status')}</th>
-                        <th className="py-4 px-6 text-left font-semibold w-[100px]">{t('cost')}</th>
-                        <th className="py-4 px-6 text-left font-semibold w-80">{t('technician')}</th>
-                        <th className="py-4 px-6 font-semibold">{t('actions')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('id')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('equipmentName')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('serialNumber')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('maintenanceDate')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('description')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('status')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('cost')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('technician')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('actions')}</th>
                     </tr>
                     </thead>
                     <tbody>
                     {maintenanceData.map((maintenance) => (
                         <tr key={maintenance.id} className="border-t border-gray-200 hover:bg-gray-50">
-                            <td className="py-4 px-6 text-gray-800">{maintenance.id}</td>
-                            <td className="py-4 px-6 text-gray-800">{maintenance.equipmentName}</td>
-                            <td className="py-4 px-6 text-gray-800">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">{maintenance.id}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">{maintenance.equipmentName}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">{maintenance.serialNumber}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
                                 {maintenance.maintenanceDate
                                     ? format(new Date(maintenance.maintenanceDate), 'dd/MM/yyyy HH:mm')
                                     : t('noDate')}
                             </td>
-                            <td className="py-4 px-6 text-gray-800">{maintenance.description || 'N/A'}</td>
-                            <td className="py-4 px-6">
-                                    <span
-                                        className={`inline-block px-3 py-1 text-sm font-medium rounded-full border ${getStatusColor(
-                                            maintenance.status
-                                        )}`}
-                                    >
-                                        {getTranslatedStatus(maintenance.status)}
-                                    </span>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">{maintenance.description || 'N/A'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                <span
+                                    className={`inline-block px-3 py-1 text-sm font-medium rounded-full border ${getStatusColor(
+                                        maintenance.status
+                                    )}`}
+                                >
+                                    {getTranslatedStatus(maintenance.status)}
+                                </span>
                             </td>
-                            <td className="py-4 px-6 text-gray-800">{formatCurrency(maintenance.cost)}</td>
-                            <td className="py-4 px-6 text-gray-800">{maintenance.technician || 'N/A'}</td>
-                            <td className="py-4 px-6 text-center">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">{formatCurrency(maintenance.cost)}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">{maintenance.technician || 'N/A'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
                                 <div className="flex justify-center gap-3">
                                     <button
                                         onClick={() => handleOpenEditModal(maintenance)}
@@ -384,7 +395,7 @@ export default function Maintenance() {
                 onSave={handleAddMaintenance}
                 newMaintenance={newMaintenanceData}
                 onInputChange={handleAddInputChange}
-                equipments={equipmentItems}
+                equipmentItems={equipmentItems}
             />
             <EditMaintenance
                 isOpen={isEditModalOpen}
@@ -392,13 +403,13 @@ export default function Maintenance() {
                 onSave={handleEditMaintenance}
                 maintenance={selectedMaintenance || {}}
                 onInputChange={handleEditInputChange}
-                equipments={equipmentItems}
+                equipmentItems={equipmentItems}
             />
             <DeleteMaintenance
                 isOpen={isDeleteModalOpen}
                 onClose={() => setIsDeleteModalOpen(false)}
                 onConfirm={handleDeleteMaintenance}
-                equipmentName={maintenanceToDelete?.equipmentName || ''}
+                equipmentItemName={maintenanceToDelete?.serialNumber || ''}
             />
         </div>
     );

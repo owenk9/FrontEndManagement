@@ -39,11 +39,11 @@ export default function NavBar() {
                         </div>
                         <nav className="mt-4">
                             <NavItem to="/" icon={homepage} label={t('home')} />
-                            <NavItem to="/equipments" icon={equipment} label={t('equipments')} />
+                            <NavItem to="/equipments" icon={equipment} label={t('equipment')} />
                             <NavItem to="/category" icon={category} label={t('category')} />
                             <NavItem to="/maintenance" icon={maintenance} label={t('maintenance')} />
                             <NavItem to="/borrowing" icon={borrowing} label={t('borrowing')} />
-                            <NavItem to="/location" icon={location} label={t('locations')} />
+                            <NavItem to="/location" icon={location} label={t('location')} />
                         </nav>
                     </div>
                     <div>
