@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react';
+import {useState, useEffect} from 'react';
 import SearchBar from '../Nav/SearchBar.jsx';
-import { Pencil, Trash2, Plus } from 'lucide-react';
+import {Pencil, Trash2, Plus} from 'lucide-react';
 import AddMaintenance from './AddMaintenance.jsx';
 import EditMaintenance from './EditMaintenance.jsx';
 import DeleteMaintenance from './DeleteMaintenance.jsx';
-import { useTranslation } from 'react-i18next';
-import { format } from 'date-fns';
+import {useTranslation} from 'react-i18next';
+import {format} from 'date-fns';
+import {useAuth} from "../../Auth/AuthContext.jsx";
 
 export default function Maintenance() {
-    const { t } = useTranslation();
+    const {t} = useTranslation();
+    const { fetchWithAuth } = useAuth();
 
     const [maintenanceData, setMaintenanceData] = useState([]);
     const [equipmentItems, setEquipmentItems] = useState([]);
@@ -44,27 +46,30 @@ export default function Maintenance() {
         return formatter.format(value).replace('₫', 'đ');
     };
 
+
     const fetchMaintenanceData = async (page = 0, search = '') => {
         try {
             setLoading(true);
             let url = `${BASE_URL}/maintenance/get?page=${page}&size=${pageSize}`;
             if (search) url += `&name=${encodeURIComponent(search)}`;
-            const response = await fetch(url, {
+            const response = await fetchWithAuth(url, {
                 method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+                },
             });
             if (!response.ok) throw new Error(t('fetchError'));
             const data = await response.json();
             const maintenanceList = data.content || [];
 
-            // Fetch equipment items to map equipment names and serial numbers
-            const itemResponse = await fetch(`${BASE_URL}/item/get?page=0&size=100`, {
+            const itemResponse = await fetchWithAuth(`${BASE_URL}/item/get?page=0&size=100`, {
                 method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {'Content-Type': 'application/json'},
             });
             if (!itemResponse.ok) throw new Error(t('fetchError'));
             const itemsData = await itemResponse.json();
-            const itemsContent = itemsData.content || itemsData; // Fallback if content is missing
+            const itemsContent = itemsData.content || itemsData;
             const itemsMap = Array.isArray(itemsContent) ? itemsContent.reduce((map, item) => {
                 map[item.id] = item;
                 return map;
@@ -74,7 +79,7 @@ export default function Maintenance() {
                 const equipmentItem = itemsMap[maintenance.equipmentItemId] || {};
                 return {
                     ...maintenance,
-                    equipmentName: equipmentItem.equipmentName || 'N/A', // Use equipmentName directly
+                    equipmentName: equipmentItem.equipmentName || 'N/A',
                     serialNumber: equipmentItem.serialNumber || 'N/A',
                 };
             });
@@ -90,9 +95,9 @@ export default function Maintenance() {
 
     const fetchEquipmentItems = async () => {
         try {
-            const response = await fetch(`${BASE_URL}/item/get?page=0&size=100`, {
+            const response = await fetchWithAuth(`${BASE_URL}/item/get?page=0&size=100`, {
                 method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {'Content-Type': 'application/json'},
             });
             if (!response.ok) throw new Error(t('fetchError'));
             const data = await response.json();
@@ -116,14 +121,10 @@ export default function Maintenance() {
     }, []);
 
     const handleAddMaintenance = async () => {
-        if (!newMaintenanceData.equipmentItemId || !newMaintenanceData.maintenanceDate || !newMaintenanceData.cost || !newMaintenanceData.technician) {
-            alert(t('fillRequiredMaintenanceFields'));
-            return;
-        }
         try {
-            const response = await fetch(`${BASE_URL}/maintenance/add`, {
+            const response = await fetchWithAuth(`${BASE_URL}/maintenance/add`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     equipmentItemId: parseInt(newMaintenanceData.equipmentItemId),
                     maintenanceDate: newMaintenanceData.maintenanceDate,
@@ -158,9 +159,9 @@ export default function Maintenance() {
             return;
         }
         try {
-            const response = await fetch(`${BASE_URL}/maintenance/update/${selectedMaintenance.id}`, {
+            const response = await fetchWithAuth(`${BASE_URL}/maintenance/update/${selectedMaintenance.id}`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     equipmentItemId: parseInt(selectedMaintenance.equipmentItemId),
                     maintenanceDate: selectedMaintenance.maintenanceDate,
@@ -184,9 +185,9 @@ export default function Maintenance() {
 
     const handleDeleteMaintenance = async () => {
         try {
-            const response = await fetch(`${BASE_URL}/maintenance/delete/${maintenanceToDelete.id}`, {
+            const response = await fetchWithAuth(`${BASE_URL}/maintenance/delete/${maintenanceToDelete.id}`, {
                 method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {'Content-Type': 'application/json'},
             });
             if (!response.ok) {
                 const errorText = await response.text();
@@ -271,7 +272,7 @@ export default function Maintenance() {
         setSelectedMaintenance({
             ...maintenance,
             equipmentItemId: maintenance.equipmentItemId,
-            equipmentName: equipmentItem?.equipmentName || 'N/A', // Use equipmentName directly
+            equipmentName: equipmentItem?.equipmentName || 'N/A',
         });
         setIsEditModalOpen(true);
     };
@@ -280,16 +281,18 @@ export default function Maintenance() {
         setIsDeleteModalOpen(true);
     };
     const handleAddInputChange = (e) => {
-        const { name, value } = e.target;
-        setNewMaintenanceData((prev) => ({ ...prev, [name]: value }));
+        const {name, value} = e.target;
+        setNewMaintenanceData((prev) => ({...prev, [name]: value}));
     };
     const handleEditInputChange = (e) => {
-        const { name, value } = e.target;
-        setSelectedMaintenance((prev) => ({ ...prev, [name]: value }));
+        const {name, value} = e.target;
+        setSelectedMaintenance((prev) => ({...prev, [name]: value}));
     };
 
-    if (loading) return <div className="min-h-screen p-6 min-w-full flex items-center justify-center"><p>{t('loading')}</p></div>;
-    if (error) return <div className="min-h-screen p-6 min-w-full flex items-center justify-center"><p className="text-red-600">{t('error')}: {error}</p></div>;
+    if (loading) return <div className="min-h-screen p-6 min-w-full flex items-center justify-center">
+        <p>{t('loading')}</p></div>;
+    if (error) return <div className="min-h-screen p-6 min-w-full flex items-center justify-center"><p
+        className="text-red-600">{t('error')}: {error}</p></div>;
 
     return (
         <div className="min-h-screen p-6 min-w-full overflow-auto">
@@ -297,12 +300,12 @@ export default function Maintenance() {
                 <h1 className="text-3xl font-bold text-gray-900">{t('maintenance')}</h1>
             </div>
             <div className="mb-6 flex justify-between items-center">
-                <SearchBar onSearch={handleSearch} />
+                <SearchBar onSearch={handleSearch}/>
                 <button
                     className="flex items-center gap-2 bg-black text-white py-2 px-4 rounded-md hover:bg-gray-700 transition duration-200"
                     onClick={handleOpenAddModal}
                 >
-                    <Plus size={16} />
+                    <Plus size={16}/>
                     {t('addMaintenance')}
                 </button>
             </div>
@@ -350,13 +353,13 @@ export default function Maintenance() {
                                         onClick={() => handleOpenEditModal(maintenance)}
                                         className="p-2 text-blue-700 font-bold rounded-md hover:bg-blue-600 hover:text-white transition duration-200 cursor-pointer"
                                     >
-                                        <Pencil size={16} />
+                                        <Pencil size={16}/>
                                     </button>
                                     <button
                                         onClick={() => handleOpenDeleteModal(maintenance)}
                                         className="px-2 py-1 text-red-700 font-bold rounded-md hover:bg-red-500 hover:text-white transition duration-200 cursor-pointer"
                                     >
-                                        <Trash2 size={16} />
+                                        <Trash2 size={16}/>
                                     </button>
                                 </div>
                             </td>
@@ -396,6 +399,7 @@ export default function Maintenance() {
                 newMaintenance={newMaintenanceData}
                 onInputChange={handleAddInputChange}
                 equipmentItems={equipmentItems}
+                maintenanceData={maintenanceData} // Truyền maintenanceData
             />
             <EditMaintenance
                 isOpen={isEditModalOpen}

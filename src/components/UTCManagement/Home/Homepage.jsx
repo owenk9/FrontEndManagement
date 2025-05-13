@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import {useAuth} from "../../Auth/AuthContext.jsx";
 
 export default function Home() {
     const { t } = useTranslation();
+    const {fetchWithAuth} = useAuth();
     const navigate = useNavigate();
     const BASE_URL = 'http://localhost:9090';
 
@@ -11,10 +13,43 @@ export default function Home() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+
+    // Hàm làm mới token
+    const refreshToken = useCallback(async () => {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (!refreshToken) {
+            setError(t('noRefreshToken'));
+            setLoading(false);
+            navigate('/login');
+            return false;
+        }
+
+        try {
+            const response = await fetchWithAuth(`${BASE_URL}/auth/refresh`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refreshToken }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || t('refreshTokenFailed'));
+            }
+            localStorage.setItem('accessToken', data.accessToken);
+            localStorage.setItem('refreshToken', data.refreshToken || localStorage.getItem('refreshToken'));
+            return true;
+        } catch (err) {
+            console.error('Refresh token error:', err);
+            setError(err.message || t('refreshTokenFailed'));
+            setLoading(false);
+            navigate('/login');
+            return false;
+        }
+    }, [t, navigate]);
+
     // Fetch dữ liệu người dùng
     const fetchUser = useCallback(async () => {
-        const token = localStorage.getItem('token');
-        if (!token) {
+        let accessToken = localStorage.getItem('accessToken');
+        if (!accessToken) {
             setError(t('noToken'));
             setLoading(false);
             navigate('/login');
@@ -22,30 +57,51 @@ export default function Home() {
         }
 
         try {
-            const response = await fetch(`${BASE_URL}/user/me`, {
+            const response = await fetchWithAuth(`${BASE_URL}/user/me`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
+                    Authorization: `Bearer ${accessToken}`,
                 },
             });
             if (!response.ok) {
                 if (response.status === 401 || response.status === 403) {
-                    localStorage.removeItem('token');
-                    navigate('/login');
-                    throw new Error(t('unauthorized'));
+                    const refreshed = await refreshToken();
+                    if (refreshed) {
+                        accessToken = localStorage.getItem('accessToken');
+                        const retryResponse = await fetchWithAuth(`${BASE_URL}/user/me`, {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                Authorization: `Bearer ${accessToken}`,
+                            },
+                        });
+                        if (!retryResponse.ok) {
+                            throw new Error(t('fetchErrorAfterRefresh'));
+                        }
+                        const data = await retryResponse.json();
+                        setUser(data);
+                        setError(null);
+                    } else {
+                        throw new Error(t('unauthorized'));
+                    }
+                } else {
+                    throw new Error(t('fetchError'));
                 }
-                throw new Error(t('fetchError'));
             }
             const data = await response.json();
             setUser(data);
             setError(null);
         } catch (err) {
             setError(err.message);
+            setLoading(false);
+            if (err.message.includes('unauthorized')) {
+                navigate('/login');
+            }
         } finally {
             setLoading(false);
         }
-    }, [t, navigate]);
+    }, [t, navigate, refreshToken]);
 
     useEffect(() => {
         fetchUser();

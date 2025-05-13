@@ -118,8 +118,8 @@ i18n
                     areYouSureDeleteLocation: 'Are you sure you want to delete this location',
 
                     // Maintenance
-                    statusPending: 'Pending',
-                    statusInProgress: 'IN PROGRESS',
+                    statusPending: 'PENDING',
+                    statusInProgress: 'IN_PROGRESS',
                     statusWaitingForParts: 'Waiting for Parts',
                     statusCompleted: 'COMPLETED',
                     statusCanceled: 'CANCELED',
@@ -197,6 +197,26 @@ i18n
                     noEquipmentItems: 'No equipment items',
                     noEquipments: 'No equipments',
                     noEquipment: 'No equipment',
+                    notifications: 'Notifications',
+                    statusApproved: 'APPROVED',
+                    statusRejected: 'REJECTED',
+                    // header
+                    fullName: "Full name",
+                    personalInformation: 'Personal information',
+                    department: 'Department',
+                    noItems: 'No items',
+                    //Filter
+                    allLocations: 'All locations',
+                    allCategories: 'All categories',
+                    //user
+                    user: 'User',
+                    addUser: 'Add user',
+                    firstName: 'First name',
+                    lastName: 'Last name',
+                    admin: "Admin",
+
+                    superAdmin: 'Super Admin',
+
                 },
             },
             vi: {

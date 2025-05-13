@@ -3,9 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { CheckCircle, XCircle, Loader2, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
 import 'react-loading-skeleton/dist/skeleton.css';
 import debounce from 'lodash.debounce';
+import { useNavigate } from 'react-router-dom';
 
-export default function BorrowTable({ searchQuery, filterParams, setCategories, setLocations }) {
+export default function BorrowTable({ searchQuery, filterParams, setCategories, setLocations, userId }) {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const [equipments, setEquipments] = useState([]);
     const [equipmentItems, setEquipmentItems] = useState({});
     const [equipmentQuantities, setEquipmentQuantities] = useState({});
@@ -16,6 +18,7 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
     const [isBookingLater, setIsBookingLater] = useState(false);
     const [borrowDetails, setBorrowDetails] = useState({
         borrowDate: new Date().toISOString().slice(0, 16),
+        returnDate: new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().slice(0, 16),
         note: '',
     });
     const [submitting, setSubmitting] = useState(false);
@@ -28,9 +31,40 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
 
     const BASE_URL = 'http://localhost:9090';
 
+    // Hàm làm mới token
+    const refreshToken = async () => {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (!refreshToken) {
+            setError(t('noRefreshToken'));
+            navigate('/login');
+            return false;
+        }
+
+        try {
+            const response = await fetch(`${BASE_URL}/auth/refresh`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refreshToken }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || t('refreshTokenFailed'));
+            }
+            localStorage.setItem('accessToken', data.accessToken);
+            localStorage.setItem('refreshToken', data.refreshToken || localStorage.getItem('refreshToken'));
+            return true;
+        } catch (err) {
+            console.error('Refresh token error:', err);
+            setError(err.message || t('refreshTokenFailed'));
+            navigate('/login');
+            return false;
+        }
+    };
+
     const fetchEquipmentData = useCallback(async (page = 0) => {
         try {
             setLoading(true);
+            let accessToken = localStorage.getItem('accessToken');
             let url = `${BASE_URL}/equipment/get?page=${page}&size=${pageSize}`;
             if (searchQuery) url += `&name=${encodeURIComponent(searchQuery)}`;
             if (filterParams.filterCategory) url += `&categoryId=${filterParams.filterCategory}`;
@@ -40,42 +74,103 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
             console.log('Fetching URL:', url);
             const response = await fetch(url, {
                 method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(accessToken && { 'Authorization': `Bearer ${accessToken}` }),
+                },
             });
+
             if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`${t('fetchError')}: ${errorText}`);
-            }
-            const data = await response.json();
-            const equipmentList = data.content || [];
-
-            const quantities = {};
-            await Promise.all(
-                equipmentList.map(async (equipment) => {
-                    let itemUrl = `${BASE_URL}/item/get?equipmentId=${equipment.id}`;
-                    if (filterParams.filterLocation) itemUrl += `&locationId=${filterParams.filterLocation}`;
-                    try {
-                        const itemResponse = await fetch(itemUrl, {
+                if (response.status === 401 || response.status === 403) {
+                    const refreshed = await refreshToken();
+                    if (refreshed) {
+                        accessToken = localStorage.getItem('accessToken');
+                        const retryResponse = await fetch(url, {
                             method: 'GET',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${accessToken}`,
+                            },
                         });
-                        if (!itemResponse.ok) {
-                            console.error(`Failed to fetch items for equipment ${equipment.id}`);
-                            quantities[equipment.id] = 0;
-                            return;
+                        if (!retryResponse.ok) {
+                            const errorText = await retryResponse.text();
+                            throw new Error(`${t('fetchErrorAfterRefresh')}: ${errorText}`);
                         }
-                        const items = await itemResponse.json();
-                        quantities[equipment.id] = items.length;
-                    } catch (err) {
-                        console.error(`Error fetching items for equipment ${equipment.id}:`, err);
-                        quantities[equipment.id] = 0;
-                    }
-                })
-            );
+                        const data = await retryResponse.json();
+                        const equipmentList = data.content || [];
 
-            setEquipments(equipmentList);
-            setEquipmentQuantities(quantities);
-            setTotalPages(data.totalPages || 1);
+                        const quantities = {};
+                        await Promise.all(
+                            equipmentList.map(async (equipment) => {
+                                let itemUrl = `${BASE_URL}/item/get?equipmentId=${equipment.id}`;
+                                if (filterParams.filterLocation) itemUrl += `&locationId=${filterParams.filterLocation}`;
+                                try {
+                                    const itemResponse = await fetch(itemUrl, {
+                                        method: 'GET',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'Authorization': `Bearer ${accessToken}`,
+                                        },
+                                    });
+                                    if (!itemResponse.ok) {
+                                        console.error(`Failed to fetch items for equipment ${equipment.id}`);
+                                        quantities[equipment.id] = 0;
+                                        return;
+                                    }
+                                    const items = await itemResponse.json();
+                                    quantities[equipment.id] = items.length;
+                                } catch (err) {
+                                    console.error(`Error fetching items for equipment ${equipment.id}:`, err);
+                                    quantities[equipment.id] = 0;
+                                }
+                            })
+                        );
+
+                        setEquipments(equipmentList);
+                        setEquipmentQuantities(quantities);
+                        setTotalPages(data.totalPages || 1);
+                    } else {
+                        throw new Error(t('unauthorized'));
+                    }
+                } else {
+                    const errorText = await response.text();
+                    throw new Error(`${t('fetchError')}: ${errorText}`);
+                }
+            } else {
+                const data = await response.json();
+                const equipmentList = data.content || [];
+
+                const quantities = {};
+                await Promise.all(
+                    equipmentList.map(async (equipment) => {
+                        let itemUrl = `${BASE_URL}/item/get?equipmentId=${equipment.id}`;
+                        if (filterParams.filterLocation) itemUrl += `&locationId=${filterParams.filterLocation}`;
+                        try {
+                            const itemResponse = await fetch(itemUrl, {
+                                method: 'GET',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    ...(accessToken && { 'Authorization': `Bearer ${accessToken}` }),
+                                },
+                            });
+                            if (!itemResponse.ok) {
+                                console.error(`Failed to fetch items for equipment ${equipment.id}`);
+                                quantities[equipment.id] = 0;
+                                return;
+                            }
+                            const items = await itemResponse.json();
+                            quantities[equipment.id] = items.length;
+                        } catch (err) {
+                            console.error(`Error fetching items for equipment ${equipment.id}:`, err);
+                            quantities[equipment.id] = 0;
+                        }
+                    })
+                );
+
+                setEquipments(equipmentList);
+                setEquipmentQuantities(quantities);
+                setTotalPages(data.totalPages || 1);
+            }
         } catch (err) {
             console.error('Fetch equipment error:', err);
             setError(err.message);
@@ -87,20 +182,48 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
     const fetchEquipmentItems = useCallback(async (equipmentId) => {
         try {
             setItemsLoading((prev) => ({ ...prev, [equipmentId]: true }));
+            let accessToken = localStorage.getItem('accessToken');
             let url = `${BASE_URL}/item/get?equipmentId=${equipmentId}`;
             if (filterParams.filterLocation) url += `&locationId=${filterParams.filterLocation}`;
 
             console.log('Fetching equipment items URL:', url);
             const response = await fetch(url, {
                 method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(accessToken && { 'Authorization': `Bearer ${accessToken}` }),
+                },
             });
+
             if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`${t('fetchError')}: ${errorText}`);
+                if (response.status === 401 || response.status === 403) {
+                    const refreshed = await refreshToken();
+                    if (refreshed) {
+                        accessToken = localStorage.getItem('accessToken');
+                        const retryResponse = await fetch(url, {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${accessToken}`,
+                            },
+                        });
+                        if (!retryResponse.ok) {
+                            const errorText = await retryResponse.text();
+                            throw new Error(`${t('fetchErrorAfterRefresh')}: ${errorText}`);
+                        }
+                        const data = await retryResponse.json();
+                        setEquipmentItems((prev) => ({ ...prev, [equipmentId]: data || [] }));
+                    } else {
+                        throw new Error(t('unauthorized'));
+                    }
+                } else {
+                    const errorText = await response.text();
+                    throw new Error(`${t('fetchError')}: ${errorText}`);
+                }
+            } else {
+                const data = await response.json();
+                setEquipmentItems((prev) => ({ ...prev, [equipmentId]: data || [] }));
             }
-            const data = await response.json();
-            setEquipmentItems((prev) => ({ ...prev, [equipmentId]: data || [] }));
         } catch (err) {
             console.error('Fetch equipment items error:', err);
             setError(err.message);
@@ -131,44 +254,82 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
         return () => debouncedFetchEquipmentData.cancel();
     }, [currentPage, debouncedFetchEquipmentData]);
 
-    // New useEffect to handle location filter changes
     useEffect(() => {
-        // Clear equipmentItems when location filter changes
         setEquipmentItems({});
-        // Refetch items for the currently expanded equipment, if any
-        if (expandedEquipmentId) {
-            fetchEquipmentItems(expandedEquipmentId);
-        }
-        // If the modal is open, refetch items for the selected equipment
+        equipments.forEach((equipment) => fetchEquipmentItems(equipment.id));
         if (isModalOpen && selectedEquipment) {
             fetchEquipmentItems(selectedEquipment.id);
         }
-    }, [filterParams.filterLocation, expandedEquipmentId, isModalOpen, selectedEquipment, fetchEquipmentItems]);
+    }, [filterParams.filterLocation, isModalOpen, selectedEquipment, fetchEquipmentItems, equipments]);
 
     useEffect(() => {
         const fetchInitialData = async () => {
             try {
+                let accessToken = localStorage.getItem('accessToken');
                 const [categoriesRes, locationsRes] = await Promise.all([
                     fetch(`${BASE_URL}/category/get?page=0&size=10`, {
                         method: 'GET',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...(accessToken && { 'Authorization': `Bearer ${accessToken}` }),
+                        },
                     }),
                     fetch(`${BASE_URL}/location/get?page=0&size=10`, {
                         method: 'GET',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...(accessToken && { 'Authorization': `Bearer ${accessToken}` }),
+                        },
                     }),
                 ]);
 
-                if (!categoriesRes.ok) throw new Error(`${t('fetchError')}: Categories`);
-                if (!locationsRes.ok) throw new Error(`${t('fetchError')}: Locations`);
+                if (!categoriesRes.ok || !locationsRes.ok) {
+                    if (categoriesRes.status === 401 || categoriesRes.status === 403 || locationsRes.status === 401 || locationsRes.status === 403) {
+                        const refreshed = await refreshToken();
+                        if (refreshed) {
+                            accessToken = localStorage.getItem('accessToken');
+                            const [retryCategoriesRes, retryLocationsRes] = await Promise.all([
+                                fetch(`${BASE_URL}/category/get?page=0&size=10`, {
+                                    method: 'GET',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Bearer ${accessToken}`,
+                                    },
+                                }),
+                                fetch(`${BASE_URL}/location/get?page=0&size=10`, {
+                                    method: 'GET',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Bearer ${accessToken}`,
+                                    },
+                                }),
+                            ]);
+                            if (!retryCategoriesRes.ok) throw new Error(`${t('fetchErrorAfterRefresh')}: Categories`);
+                            if (!retryLocationsRes.ok) throw new Error(`${t('fetchErrorAfterRefresh')}: Locations`);
 
-                const [categoriesData, locationsData] = await Promise.all([
-                    categoriesRes.json(),
-                    locationsRes.json(),
-                ]);
+                            const [categoriesData, locationsData] = await Promise.all([
+                                retryCategoriesRes.json(),
+                                retryLocationsRes.json(),
+                            ]);
 
-                setCategories(categoriesData.content || []);
-                setLocations(locationsData.content || []);
+                            setCategories(categoriesData.content || []);
+                            setLocations(locationsData.content || []);
+                        } else {
+                            throw new Error(t('unauthorized'));
+                        }
+                    } else {
+                        if (!categoriesRes.ok) throw new Error(`${t('fetchError')}: Categories`);
+                        if (!locationsRes.ok) throw new Error(`${t('fetchError')}: Locations`);
+                    }
+                } else {
+                    const [categoriesData, locationsData] = await Promise.all([
+                        categoriesRes.json(),
+                        locationsRes.json(),
+                    ]);
+
+                    setCategories(categoriesData.content || []);
+                    setLocations(locationsData.content || []);
+                }
             } catch (err) {
                 console.error('Fetch initial data error:', err);
                 setError(err.message);
@@ -183,7 +344,7 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
             setExpandedEquipmentId(null);
         } else {
             setExpandedEquipmentId(equipmentId);
-            fetchEquipmentItems(equipmentId); // Always refetch items to ensure freshness
+            fetchEquipmentItems(equipmentId);
         }
     };
 
@@ -193,9 +354,10 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
         setIsBookingLater(true);
         setBorrowDetails({
             borrowDate: new Date().toISOString().slice(0, 16),
+            returnDate: new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().slice(0, 16),
             note: '',
         });
-        fetchEquipmentItems(equipment.id); // Always fetch fresh items when opening the modal
+        fetchEquipmentItems(equipment.id);
         setIsModalOpen(true);
     };
 
@@ -206,27 +368,59 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
         }
         setSubmitting(true);
         try {
+            let accessToken = localStorage.getItem('accessToken');
+            if (!accessToken) {
+                setError(t('noToken'));
+                navigate('/login');
+                return;
+            }
+
             const borrowData = {
-                equipmentItemId: selectedEquipmentItemId,
-                usersId: 1,
+                equipmentItemId: parseInt(selectedEquipmentItemId),
+                usersId: userId,
+                note: borrowDetails.note,
                 borrowDate: borrowDetails.borrowDate + ':00',
+                returnDate: borrowDetails.returnDate + ':00',
                 status: 'PENDING',
             };
-            const response = await fetch(`${BASE_URL}/borrow/add`, {
+            const response = await fetch(`${BASE_URL}/borrowing/request`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accessToken}`,
+                },
                 body: JSON.stringify(borrowData),
             });
+
             if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(errorText || t('bookLaterError'));
+                if (response.status === 401 || response.status === 403) {
+                    const refreshed = await refreshToken();
+                    if (refreshed) {
+                        accessToken = localStorage.getItem('accessToken');
+                        const retryResponse = await fetch(`${BASE_URL}/borrowing/request`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${accessToken}`,
+                            },
+                            body: JSON.stringify(borrowData),
+                        });
+                        if (!retryResponse.ok) {
+                            const errorText = await retryResponse.text();
+                            throw new Error(errorText || t('bookLaterError'));
+                        }
+                    } else {
+                        throw new Error(t('unauthorized'));
+                    }
+                } else {
+                    const errorText = await response.text();
+                    throw new Error(errorText || t('bookLaterError'));
+                }
             }
+
             setIsModalOpen(false);
             alert(t('bookLaterSuccess', { name: selectedEquipment.name }));
-            fetchEquipmentData(currentPage);
-            if (expandedEquipmentId) {
-                fetchEquipmentItems(expandedEquipmentId);
-            }
+            window.dispatchEvent(new Event('refreshBorrowingList'));
         } catch (err) {
             alert(err.message);
         } finally {
@@ -240,9 +434,9 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
             (item) => item.id === parseInt(selectedEquipmentItemId)
         );
         if (!selectedItem || !selectedItem.returnDate) {
-            return new Date(borrowDetails.borrowDate) >= new Date();
+            return new Date(borrowDetails.borrowDate) >= new Date() && new Date(borrowDetails.returnDate) > new Date(borrowDetails.borrowDate);
         }
-        return new Date(borrowDetails.borrowDate) >= new Date(selectedItem.returnDate);
+        return new Date(borrowDetails.borrowDate) >= new Date(selectedItem.returnDate) && new Date(borrowDetails.returnDate) > new Date(borrowDetails.borrowDate);
     };
 
     const formatReturnDate = (returnDate) => {
@@ -256,7 +450,7 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                 day: '2-digit',
                 hour: '2-digit',
                 minute: '2-digit',
-                hour12: false
+                hour12: false,
             }).replace(',', '');
         } catch {
             return '-';
@@ -302,6 +496,33 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
             default:
                 return status;
         }
+    };
+
+    const getStatusDistribution = (equipmentId) => {
+        const items = equipmentItems[equipmentId] || [];
+        const statusCount = {
+            ACTIVE: 0,
+            BROKEN: 0,
+            MAINTENANCE: 0,
+            BORROWED: 0,
+        };
+        items.forEach((item) => {
+            switch (item.status) {
+                case 'ACTIVE':
+                    statusCount.ACTIVE++;
+                    break;
+                case 'BROKEN':
+                    statusCount.BROKEN++;
+                    break;
+                case 'MAINTENANCE':
+                    statusCount.MAINTENANCE++;
+                    break;
+                case 'BORROWED':
+                    statusCount.BORROWED++;
+                    break;
+            }
+        });
+        return `${statusCount.ACTIVE}/${statusCount.BROKEN}/${statusCount.MAINTENANCE}/${statusCount.BORROWED}`;
     };
 
     const handlePageChange = (page) => {
@@ -353,7 +574,10 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
 
     return (
         <div className="flex-1 bg-white p-6 rounded-lg shadow-md">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('equipments')}</h2>
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">{t('equipments')}</h2>
+                {/*<NotificationBell userId={userId} />*/}
+            </div>
             {equipments.length > 0 || loading ? (
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
@@ -362,6 +586,7 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('name')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('image')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('quantity')}</th>
+                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">{t('status')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('category')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('description')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('actions')}</th>
@@ -400,6 +625,27 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         {equipmentQuantities[equipment.id] !== undefined ? equipmentQuantities[equipment.id] : '-'}
                                     </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <span className="flex items-center text-center space-x-1">
+                                                <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('ACTIVE')}`}>
+                                                    {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[0] : '0'}
+                                                </span>
+                                                <span className="text-gray-500">/</span>
+                                                <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('BROKEN')}`}>
+                                                    {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[1] : '0'}
+                                                </span>
+                                                <span className="text-gray-500">/</span>
+                                                <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('MAINTENANCE')}`}>
+                                                    {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[2] : '0'}
+                                                </span>
+                                                <span className="text-gray-500">/</span>
+                                                <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('BORROWED')}`}>
+                                                    {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[3] : '0'}
+                                                </span>
+                                            </span>
+                                        </td>
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{equipment.categoryName || '-'}</td>
                                     <td className="px-6 py-4 text-sm text-gray-500">{equipment.description || '-'}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm flex space-x-2">
@@ -416,7 +662,7 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                                 </tr>
                                 {expandedEquipmentId === equipment.id && (
                                     <tr key={`expanded-${equipment.id}`}>
-                                        <td colSpan="6" className="bg-gray-50 p-4">
+                                        <td colSpan="7" className="bg-gray-50 p-4">
                                             {itemsLoading[equipment.id] ? (
                                                 <div className="flex justify-center items-center py-4">
                                                     <Loader2 size={24} className="animate-spin text-gray-600" />
@@ -493,7 +739,7 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                     <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md pointer-events-auto">
                         <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('bookLaterEquipment')}</h2>
                         <p className="text-gray-600 mb-4">
-                            {t('bookLaterConfirm', { name: selectedEquipment?.name })}
+                            {t('', { name: selectedEquipment?.name })}
                         </p>
                         <div className="mb-4">
                             <label className="block text-sm font-medium text-gray-700">{t('equipmentItem')}</label>
@@ -507,8 +753,8 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                                     required
                                 >
                                     <option value="">{t('selectEquipmentItem')}</option>
-                                    {equipmentItems[selectedEquipment.id]
-                                        .filter((item) => item.status === 'ACTIVE' || item.status === 'BORROWED')
+                                    {equipmentItems[selectedEquipment?.id]
+                                        .filter((item) => item.status === 'ACTIVE')
                                         .map((item) => (
                                             <option key={`option-${item.id}`} value={item.id}>
                                                 {item.serialNumber} ({getTranslatedStatus(item.status)}, {item.locationName || 'No Location'})
@@ -541,13 +787,27 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                             )}
                         </div>
                         <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700">{t('returnDate')}</label>
+                            <input
+                                type="datetime-local"
+                                value={borrowDetails.returnDate}
+                                onChange={(e) => setBorrowDetails({ ...borrowDetails, returnDate: e.target.value })}
+                                min={borrowDetails.borrowDate}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                required
+                            />
+                            {isBookingLater && !isBorrowDateValid() && (
+                                <p className="text-red-600 text-sm mt-1">{t('invalidReturnDate')}</p>
+                            )}
+                        </div>
+                        <div className="mb-4">
                             <label className="block text-sm font-medium text-gray-700">{t('note')}</label>
                             <textarea
                                 value={borrowDetails.note}
                                 onChange={(e) => setBorrowDetails({ ...borrowDetails, note: e.target.value })}
                                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                 rows="4"
-                                placeholder={t('notePlaceholder')}
+                                placeholder={t('')}
                             />
                         </div>
                         <div className="flex justify-end space-x-4">

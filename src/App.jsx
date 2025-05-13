@@ -13,6 +13,7 @@ import Location from './components/UTCManagement/Location/Location.jsx';
 import Login from './components/UTCManagement/User/Login.jsx';
 import ProtectedRoute from './components/UTCManagement/ProtectedRoute.jsx';
 import Borrow from "./components/Borrow/Borrow.jsx";
+import User from "./components/UTCManagement/User/User.jsx";
 
 function App() {
     const location = useLocation();
@@ -20,8 +21,18 @@ function App() {
     if (isSpecialPage) {
         return (
             <Routes>
-                <Route path="/login" element={<Login />} />
-                <Route path="/borrow" element={<Borrow />} />
+                <Route
+                    path="/login"
+                    element={<Login />} />
+
+                <Route
+                    path="/borrow"
+                    element={
+                        <ProtectedRoute requiredAuthorities={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN', "ROLE_USER"]}>
+                            <Borrow />
+                        </ProtectedRoute>
+                    }
+                    />
             </Routes>
         );
     }
@@ -31,9 +42,9 @@ function App() {
             <div className="flex ml-64 max-h-[100vh]">
                 <Routes>
                     <Route
-                        path="/"
+                        path="/homepage"
                         element={
-                            <ProtectedRoute>
+                            <ProtectedRoute requiredAuthorities={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
                                 <Homepage />
                             </ProtectedRoute>
                         }
@@ -41,7 +52,7 @@ function App() {
                     <Route
                         path="/category"
                         element={
-                            <ProtectedRoute>
+                            <ProtectedRoute requiredAuthorities={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
                                 <Category />
                             </ProtectedRoute>
                         }
@@ -49,7 +60,7 @@ function App() {
                     <Route
                         path="/equipments"
                         element={
-                            <ProtectedRoute>
+                            <ProtectedRoute requiredAuthorities={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
                                 <EquipmentList />
                             </ProtectedRoute>
                         }
@@ -57,7 +68,7 @@ function App() {
                     <Route
                         path="/maintenance"
                         element={
-                            <ProtectedRoute>
+                            <ProtectedRoute requiredAuthorities={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
                                 <Maintenance />
                             </ProtectedRoute>
                         }
@@ -65,7 +76,7 @@ function App() {
                     <Route
                         path="/borrowing"
                         element={
-                            <ProtectedRoute>
+                            <ProtectedRoute requiredAuthorities={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
                                 <Borrowing />
                             </ProtectedRoute>
                         }
@@ -73,15 +84,23 @@ function App() {
                     <Route
                         path="/location"
                         element={
-                            <ProtectedRoute>
+                            <ProtectedRoute requiredAuthorities={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
                                 <Location />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/user"
+                        element={
+                            <ProtectedRoute requiredAuthorities={['ROLE_SUPER_ADMIN']}>
+                                <User />
                             </ProtectedRoute>
                         }
                     />
                     <Route
                         path="/settings"
                         element={
-                            <ProtectedRoute>
+                            <ProtectedRoute requiredAuthorities={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
                                 <Settings />
                             </ProtectedRoute>
                         }

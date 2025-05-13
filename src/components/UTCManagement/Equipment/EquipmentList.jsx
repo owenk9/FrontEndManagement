@@ -9,12 +9,13 @@ import EditEquipmentItem from './EditEquipmentItem.jsx';
 import DeleteEquipmentItem from './DeleteEquipmentItem.jsx';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
+import { useAuth } from "../../Auth/AuthContext.jsx";
 
 export default function EquipmentList() {
     const { t } = useTranslation();
-
     const [equipmentData, setEquipmentData] = useState([]);
     const [locations, setLocations] = useState([]);
+    const { fetchWithAuth } = useAuth();
     const [categories, setCategories] = useState([]);
     const [equipmentQuantities, setEquipmentQuantities] = useState({});
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -48,20 +49,27 @@ export default function EquipmentList() {
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
     const [pageSize] = useState(4);
-    const [searchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
     const [expandedEquipmentId, setExpandedEquipmentId] = useState(null);
     const [equipmentItems, setEquipmentItems] = useState({});
     const [itemsLoading, setItemsLoading] = useState({});
+    const [renderKey, setRenderKey] = useState(0);
+
+    // State cho các bộ lọc (bỏ filterStatus)
+    const [filterLocationId, setFilterLocationId] = useState('');
+    const [filterCategoryId, setFilterCategoryId] = useState('');
 
     const BASE_URL = 'http://localhost:9090';
 
-    const fetchEquipmentData = async (page = 0, search = '') => {
+    const fetchEquipmentData = async (page = 0, search = '', locationId = '', categoryId = '') => {
         try {
             setLoading(true);
-            const url = search
-                ? `${BASE_URL}/equipment/get?name=${encodeURIComponent(search)}&page=${page}&size=${pageSize}`
-                : `${BASE_URL}/equipment/get?page=${page}&size=${pageSize}`;
-            const response = await fetch(url, {
+            let url = `${BASE_URL}/equipment/get?page=${page}&size=${pageSize}`;
+            if (search) url += `&name=${encodeURIComponent(search)}`;
+            if (locationId) url += `&locationId=${locationId}`;
+            if (categoryId) url += `&categoryId=${categoryId}`;
+
+            const response = await fetchWithAuth(url, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
@@ -72,7 +80,7 @@ export default function EquipmentList() {
             await Promise.all(
                 equipmentList.map(async (equipment) => {
                     try {
-                        const itemResponse = await fetch(`${BASE_URL}/item/get?equipmentId=${equipment.id}`, {
+                        const itemResponse = await fetchWithAuth(`${BASE_URL}/item/get?equipmentId=${equipment.id}`, {
                             method: 'GET',
                             headers: { 'Content-Type': 'application/json' },
                         });
@@ -106,13 +114,13 @@ export default function EquipmentList() {
         }
         try {
             setItemsLoading((prev) => ({ ...prev, [equipmentId]: true }));
-            const response = await fetch(`${BASE_URL}/item/get?equipmentId=${equipmentId}`, {
+            const response = await fetchWithAuth(`${BASE_URL}/item/get?equipmentId=${equipmentId}`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
             if (!response.ok) throw new Error(t('fetchError'));
             const data = await response.json();
-            console.log('Fetched equipment items:', data); // Debug dữ liệu
+            console.log('Fetched equipment items:', data);
             setEquipmentItems((prev) => ({ ...prev, [equipmentId]: data || [] }));
         } catch (err) {
             console.error('Failed to fetch equipment items:', err);
@@ -138,7 +146,7 @@ export default function EquipmentList() {
 
     const fetchCategories = async () => {
         try {
-            const response = await fetch(`${BASE_URL}/category/get?page=0&size=100`, {
+            const response = await fetchWithAuth(`${BASE_URL}/category/get?page=0&size=100`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
@@ -152,7 +160,7 @@ export default function EquipmentList() {
 
     const fetchLocations = async () => {
         try {
-            const response = await fetch(`${BASE_URL}/location/get?page=0&size=100`, {
+            const response = await fetchWithAuth(`${BASE_URL}/location/get?page=0&size=100`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
@@ -165,18 +173,38 @@ export default function EquipmentList() {
     };
 
     const handleSearch = (term) => {
-        fetchEquipmentData(currentPage, term);
+        setSearchTerm(term);
+        fetchEquipmentData(currentPage, term, filterLocationId, filterCategoryId);
+    };
+
+    const handleFilterChange = (type, value) => {
+        switch (type) {
+            case 'location':
+                setFilterLocationId(value);
+                break;
+            case 'category':
+                setFilterCategoryId(value);
+                break;
+            default:
+                break;
+        }
+        fetchEquipmentData(0, searchTerm, type === 'location' ? value : filterLocationId, type === 'category' ? value : filterCategoryId);
     };
 
     useEffect(() => {
         setLoading(true);
-        fetchEquipmentData(currentPage, searchTerm);
-    }, [currentPage, searchTerm]);
+        fetchEquipmentData(currentPage, searchTerm, filterLocationId, filterCategoryId);
+    }, [currentPage, searchTerm, filterLocationId, filterCategoryId]);
 
     useEffect(() => {
         fetchLocations();
         fetchCategories();
     }, []);
+
+    useEffect(() => {
+        setEquipmentItems({});
+        equipmentData.forEach((equipment) => fetchEquipmentItems(equipment.id));
+    }, [equipmentData]);
 
     const handleAddEquipment = async () => {
         try {
@@ -194,7 +222,7 @@ export default function EquipmentList() {
             formData.append('equipment', equipmentBlob);
             if (newEquipmentData.image) formData.append('image', newEquipmentData.image);
 
-            const response = await fetch(`${BASE_URL}/equipment/add`, {
+            const response = await fetchWithAuth(`${BASE_URL}/equipment/add`, {
                 method: 'POST',
                 body: formData,
             });
@@ -215,7 +243,7 @@ export default function EquipmentList() {
                 image: null,
             });
             setIsAddModalOpen(false);
-            fetchEquipmentData(currentPage, searchTerm);
+            fetchEquipmentData(currentPage, searchTerm, filterLocationId, filterCategoryId);
         } catch (err) {
             console.error('Failed to add equipment:', err);
             alert(err.message);
@@ -232,7 +260,7 @@ export default function EquipmentList() {
                 equipmentId: parseInt(newEquipmentItemData.equipmentId),
             };
 
-            const response = await fetch(`${BASE_URL}/item/add`, {
+            const response = await fetchWithAuth(`${BASE_URL}/item/add`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(itemData),
@@ -253,8 +281,7 @@ export default function EquipmentList() {
             setIsAddItemModalOpen(false);
             setSelectedEquipmentForItem(null);
             fetchEquipmentItems(newEquipmentItemData.equipmentId);
-            fetchEquipmentData(currentPage, searchTerm);
-            // Đảm bảo danh sách item hiển thị ngay sau khi thêm
+            fetchEquipmentData(currentPage, searchTerm, filterLocationId, filterCategoryId);
             if (expandedEquipmentId === newEquipmentItemData.equipmentId) {
                 fetchEquipmentItems(newEquipmentItemData.equipmentId);
             }
@@ -265,78 +292,71 @@ export default function EquipmentList() {
     };
 
     const handleEditEquipmentItem = async () => {
-        if (!selectedEquipmentItem || !selectedEquipmentItem.serialNumber) {
-            alert(t('serialNumberRequired'));
-            return;
-        }
         try {
-            console.log('Sending update for equipment item:', selectedEquipmentItem); // Debug dữ liệu gửi đi
             const itemData = {
                 serialNumber: selectedEquipmentItem.serialNumber,
-                status: selectedEquipmentItem.status || 'Active',
+                status: selectedEquipmentItem.status || 'ACTIVE',
+                purchaseDate: selectedEquipmentItem.purchaseDate || null,
                 locationId: parseInt(selectedEquipmentItem.locationId) || 0,
-                returnDate: selectedEquipmentItem.returnDate || null,
                 equipmentId: parseInt(selectedEquipmentItem.equipmentId),
             };
 
-            const response = await fetch(`${BASE_URL}/item/update/${selectedEquipmentItem.id}`, {
+            setEquipmentItems((prev) => {
+                const newItems = { ...prev };
+                if (newItems[selectedEquipmentItem.equipmentId]) {
+                    newItems[selectedEquipmentItem.equipmentId] = newItems[selectedEquipmentItem.equipmentId].map((item) =>
+                        item.id === selectedEquipmentItem.id ? { ...item, ...itemData } : item
+                    );
+                }
+                return newItems;
+            });
+            setRenderKey((prev) => prev + 1);
+
+            const response = await fetchWithAuth(`${BASE_URL}/item/update/${selectedEquipmentItem.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(itemData),
             });
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Update failed with status:', response.status, 'Response:', errorText);
-                throw new Error(t('updateItemError') + ': ' + errorText);
-            }
+            if (!response.ok) throw new Error(t('updateItemError'));
 
-            const updatedItem = await response.json(); // Lấy dữ liệu cập nhật từ server
-            console.log('Updated equipment item from server:', updatedItem); // Debug dữ liệu trả về
             setIsEditItemModalOpen(false);
-
-            // Cập nhật danh sách equipmentItems ngay lập tức
-            if (selectedEquipmentItem.equipmentId) {
-                // Làm mới danh sách item
-                await fetchEquipmentItems(selectedEquipmentItem.equipmentId);
-
-                // Đảm bảo dropdown vẫn mở để hiển thị dữ liệu mới
-                if (expandedEquipmentId !== selectedEquipmentItem.equipmentId) {
-                    setExpandedEquipmentId(selectedEquipmentItem.equipmentId);
-                }
-            }
-
             setSelectedEquipmentItem(null);
+            fetchEquipmentItems(selectedEquipmentItem.equipmentId);
         } catch (err) {
             console.error('Failed to update equipment item:', err);
             alert(err.message);
+            fetchEquipmentItems(selectedEquipmentItem.equipmentId);
         }
     };
 
     const handleDeleteEquipmentItem = async () => {
         try {
-            const response = await fetch(`${BASE_URL}/item/delete/${equipmentItemToDelete.id}`, {
+            setEquipmentItems((prev) => {
+                const newItems = { ...prev };
+                if (newItems[equipmentItemToDelete.equipmentId]) {
+                    newItems[equipmentItemToDelete.equipmentId] = newItems[equipmentItemToDelete.equipmentId].filter(
+                        (item) => item.id !== equipmentItemToDelete.id
+                    );
+                }
+                return newItems;
+            });
+            setRenderKey((prev) => prev + 1);
+
+            const response = await fetchWithAuth(`${BASE_URL}/item/delete/${equipmentItemToDelete.id}`, {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
             });
+
             if (!response.ok) throw new Error(t('deleteItemError'));
+
+            fetchEquipmentData(currentPage, searchTerm, filterLocationId, filterCategoryId);
             setIsDeleteItemModalOpen(false);
-
-            // Làm mới danh sách item sau khi xóa
-            if (equipmentItemToDelete.equipmentId) {
-                await fetchEquipmentItems(equipmentItemToDelete.equipmentId);
-
-                // Đảm bảo dropdown vẫn mở để hiển thị dữ liệu mới
-                if (expandedEquipmentId !== equipmentItemToDelete.equipmentId) {
-                    setExpandedEquipmentId(equipmentItemToDelete.equipmentId);
-                }
-            }
-
             setEquipmentItemToDelete(null);
-            fetchEquipmentData(currentPage, searchTerm);
         } catch (err) {
             console.error('Failed to delete equipment item:', err);
             alert(err.message);
+            fetchEquipmentItems(equipmentItemToDelete.equipmentId);
         }
     };
 
@@ -360,7 +380,7 @@ export default function EquipmentList() {
             formData.append('equipment', equipmentBlob);
             if (selectedEquipment.image instanceof File) formData.append('image', selectedEquipment.image);
 
-            const response = await fetch(`${BASE_URL}/equipment/update/${selectedEquipment.id}`, {
+            const response = await fetchWithAuth(`${BASE_URL}/equipment/update/${selectedEquipment.id}`, {
                 method: 'PATCH',
                 body: formData,
             });
@@ -373,7 +393,7 @@ export default function EquipmentList() {
 
             setIsEditModalOpen(false);
             setSelectedEquipment(null);
-            fetchEquipmentData(currentPage, searchTerm);
+            fetchEquipmentData(currentPage, searchTerm, filterLocationId, filterCategoryId);
 
             if (expandedEquipmentId === selectedEquipment.id) {
                 fetchEquipmentItems(selectedEquipment.id);
@@ -386,14 +406,14 @@ export default function EquipmentList() {
 
     const handleDeleteEquipment = async () => {
         try {
-            const response = await fetch(`${BASE_URL}/equipment/delete/${equipmentToDelete.id}`, {
+            const response = await fetchWithAuth(`${BASE_URL}/equipment/delete/${equipmentToDelete.id}`, {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
             });
             if (!response.ok) throw new Error(t('deleteError'));
             setIsDeleteModalOpen(false);
             setEquipmentToDelete(null);
-            fetchEquipmentData(currentPage, searchTerm);
+            fetchEquipmentData(currentPage, searchTerm, filterLocationId, filterCategoryId);
         } catch (err) {
             console.error(err);
             alert(err.message);
@@ -428,6 +448,33 @@ export default function EquipmentList() {
             default:
                 return status;
         }
+    };
+
+    const getStatusDistribution = (equipmentId) => {
+        const items = equipmentItems[equipmentId] || [];
+        const statusCount = {
+            ACTIVE: 0,
+            BROKEN: 0,
+            MAINTENANCE: 0,
+            BORROWED: 0,
+        };
+        items.forEach((item) => {
+            switch (item.status) {
+                case 'ACTIVE':
+                    statusCount.ACTIVE++;
+                    break;
+                case 'BROKEN':
+                    statusCount.BROKEN++;
+                    break;
+                case 'MAINTENANCE':
+                    statusCount.MAINENANCE++;
+                    break;
+                case 'BORROWED':
+                    statusCount.BORROWED++;
+                    break;
+            }
+        });
+        return `${statusCount.ACTIVE}/${statusCount.BROKEN}/${statusCount.MAINTENANCE}/${statusCount.BORROWED}`;
     };
 
     const handlePageChange = (page) => {
@@ -535,7 +582,7 @@ export default function EquipmentList() {
             ...prev,
             [name]: value,
         }));
-        console.log('Updated selectedEquipmentItem:', { ...selectedEquipmentItem, [name]: value }); // Debug cập nhật
+        console.log('Updated selectedEquipmentItem:', { ...selectedEquipmentItem, [name]: value });
     };
     const handleImageChange = (e) => {
         setNewEquipmentData((prev) => ({ ...prev, image: e.target.files[0] }));
@@ -558,7 +605,7 @@ export default function EquipmentList() {
             <div className="min-h-screen p-6 flex items-center justify-center">
                 <p className="text-red-600">{t('error')}: {error}</p>
                 <button
-                    onClick={() => fetchEquipmentData(0, searchTerm)}
+                    onClick={() => fetchEquipmentData(0, searchTerm, filterLocationId, filterCategoryId)}
                     className="ml-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                 >
                     {t('retry')}
@@ -568,12 +615,43 @@ export default function EquipmentList() {
     }
 
     return (
-        <div className="min-h-screen p-6 min-w-full overflow-auto">
+        <div className="min-h-screen p-6 min-w-full overflow-auto" key={renderKey}>
             <div className="mb-6">
                 <h1 className="text-3xl font-bold text-gray-900">{t('equipments')}</h1>
             </div>
-            <div className="mb-6 flex justify-between items-center">
-                <SearchBar onSearch={handleSearch} />
+            <div className="mb-6 flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                    <SearchBar onSearch={handleSearch} />
+                    {/* Filter by Location */}
+                    <select
+                        value={filterLocationId}
+                        onChange={(e) => handleFilterChange('location', e.target.value)}
+                        className="border border-gray-300 rounded-md p-2 h-10"
+                    >
+                        <option value="">{t('allLocations')}</option>
+                        {locations.map((location) => (
+                            <option key={location.id} value={location.id}>
+                                {location.locationName}
+                            </option>
+                        ))}
+                    </select>
+
+                    {/* Filter by Category */}
+                    <select
+                        value={filterCategoryId}
+                        onChange={(e) => handleFilterChange('category', e.target.value)}
+                        className="border border-gray-300 rounded-md p-2 h-10"
+                    >
+                        <option value="">{t('allCategories')}</option>
+                        {categories.map((category) => (
+                            <option key={category.id} value={category.id}>
+                                {category.categoryName}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Button Add Equipment */}
                 <button
                     className="flex items-center gap-2 bg-black text-white py-2 px-4 rounded-md hover:bg-gray-700 transition duration-200"
                     onClick={handleOpenAddModal}
@@ -590,6 +668,7 @@ export default function EquipmentList() {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('equipmentName')}</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('image')}</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('quantity')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('status')}</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('category')}</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('description')}</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('actions')}</th>
@@ -629,6 +708,25 @@ export default function EquipmentList() {
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
                                     {equipmentQuantities[equipment.id] !== undefined ? equipmentQuantities[equipment.id] : '-'}
                                 </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <span className="flex items-center text-center space-x-1">
+                                        <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('ACTIVE')}`}>
+                                            {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[0] : '0'}
+                                        </span>
+                                        <span className="text-gray-500">/</span>
+                                        <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('BROKEN')}`}>
+                                            {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[1] : '0'}
+                                        </span>
+                                        <span className="text-gray-500">/</span>
+                                        <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('MAINTENANCE')}`}>
+                                            {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[2] : '0'}
+                                        </span>
+                                        <span className="text-gray-500">/</span>
+                                        <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('BORROWED')}`}>
+                                            {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[3] : '0'}
+                                        </span>
+                                    </span>
+                                </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{equipment.categoryName}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{equipment.description || '-'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap">
@@ -656,7 +754,7 @@ export default function EquipmentList() {
                             </tr>
                             {expandedEquipmentId === equipment.id && (
                                 <tr>
-                                    <td colSpan="7" className="bg-gray-50 p-4">
+                                    <td colSpan="8" className="bg-gray-50 p-4">
                                         {itemsLoading[equipment.id] ? (
                                             <div className="flex justify-center items-center py-4">
                                                 <Loader2 size={24} className="animate-spin text-gray-600" />
@@ -690,9 +788,12 @@ export default function EquipmentList() {
                                                                         </button>
                                                                     </div>
                                                                 </div>
-                                                                <span className={`inline-block px-1 py-1 text-xs font-medium rounded-full border min-w-fit ${getStatusColor(item.status)}`}>
+                                                                <span
+                                                                    className={`inline-block px-2 py-1 text-xs font-medium rounded-full border w-fit ${getStatusColor(item.status)}`}
+                                                                >
                                                                     {getTranslatedStatus(item.status) || '-'}
                                                                 </span>
+
                                                                 <div className="text-sm text-gray-600">
                                                                     <span className="font-medium">{t('purchaseDate')}:</span> {formatDate(item.purchaseDate) || '-'}
                                                                 </div>

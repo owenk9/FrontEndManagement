@@ -1,4 +1,4 @@
-import {useState, useEffect, useMemo} from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import debounce from 'lodash.debounce';
 import Header from './Header.jsx';
 import SidebarFilter from './SidebarFilter.jsx';
@@ -6,7 +6,6 @@ import BorrowTable from './BorrowTable.jsx';
 import { t } from 'i18next';
 
 export default function Borrow() {
-    const [user] = useState({ name: 'John Doe', id: '12345' });
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
     const [filterDate, setFilterDate] = useState('');
@@ -15,28 +14,8 @@ export default function Borrow() {
     const [filterStatus, setFilterStatus] = useState('');
     const [categories, setCategories] = useState([]);
     const [locations, setLocations] = useState([]);
-    const [statuses, setStatuses] = useState([]);
-    const BASE_URL = 'http://localhost:9090';
+    const [userId, setUserId] = useState(null); // Thêm state userId
 
-    const fetchStatuses = async () => {
-        try {
-            const response = await fetch(`${BASE_URL}/equipment/get-statuses`, {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
-            });
-            if (!response.ok) throw new Error(t('fetchError'));
-            const data = await response.json();
-            setStatuses(data || []);
-        } catch (err) {
-            console.error('Fetch statuses error:', err);
-        }
-    };
-
-    useEffect(() => {
-        fetchStatuses();
-    }, []);
-
-    useEffect(() => { fetchStatuses(); }, []);
     const debouncedSetQuery = useMemo(() => {
         return debounce((value) => {
             setDebouncedSearchQuery(value);
@@ -56,7 +35,11 @@ export default function Borrow() {
 
     return (
         <div className="min-h-screen bg-gray-100 flex flex-col">
-            <Header user={user} searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+            <Header
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                setUserId={setUserId} // Truyền callback để cập nhật userId
+            />
             <div className="flex flex-1 p-6">
                 <SidebarFilter
                     filterDate={filterDate}
@@ -69,7 +52,6 @@ export default function Borrow() {
                     setFilterStatus={setFilterStatus}
                     categories={categories}
                     locations={locations}
-                    statuses={statuses}
                     filterParams={filterParams}
                     clearFilters={() => {
                         setFilterDate('');
@@ -79,12 +61,19 @@ export default function Borrow() {
                         setSearchQuery('');
                     }}
                 />
-                <BorrowTable
-                    searchQuery={debouncedSearchQuery}
-                    filterParams={filterParams}
-                    setCategories={setCategories}
-                    setLocations={setLocations}
-                />
+                {userId ? (
+                    <BorrowTable
+                        searchQuery={debouncedSearchQuery}
+                        filterParams={filterParams}
+                        setCategories={setCategories}
+                        setLocations={setLocations}
+                        userId={userId} // Truyền userId cho BorrowTable
+                    />
+                ) : (
+                    <div className="flex-1 p-6 text-center">
+                        <p className="text-gray-600">{t('loadingUserData')}...</p>
+                    </div>
+                )}
             </div>
         </div>
     );

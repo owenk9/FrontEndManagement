@@ -1,11 +1,15 @@
-import {useEffect, useState} from 'react';
+// src/components/UTCManagement/User/Login.jsx
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff } from 'lucide-react';
+import { useAuth } from '../../Auth/AuthContext.jsx';
+import {jwtDecode} from "jwt-decode";
 
 export default function Login() {
     const { t } = useTranslation();
     const navigate = useNavigate();
+    const { refreshToken, logout } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState(null);
@@ -17,14 +21,13 @@ export default function Login() {
 
     const validateForm = () => {
         if (!email || !password) {
-            setValidationError(t('invalidCredentials') || 'Tài khoản hoặc mật khẩu không hợp lệ');
+            setValidationError(t('invalidCredentials') || 'Email or password is required');
             return false;
         }
 
-        // Email format validation
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
-            setValidationError(t('invalidCredentials') || 'Tài khoản hoặc mật khẩu không hợp lệ');
+            setValidationError(t('invalidCredentials') || 'Invalid email format');
             return false;
         }
 
@@ -32,10 +35,29 @@ export default function Login() {
         return true;
     };
 
+    const decodeToken = async (token) => {
+        try {
+            let decoded = jwtDecode(token);
+            const currentTime = Date.now() / 1000;
+            if (decoded.exp < currentTime) {
+                token = await refreshToken();
+                decoded = jwtDecode(token);
+            }
+            console.log(decoded)
+            return {
+                id: decoded.sub,
+                authorities: decoded.authorities || [],
+            };
+        } catch (error) {
+            console.error('Invalid token:', error);
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            // logout()
+        }
+    }
     const handleLogin = async (e) => {
         e.preventDefault();
 
-        // Validate form first
         if (!validateForm()) {
             return;
         }
@@ -50,21 +72,34 @@ export default function Login() {
                 body: JSON.stringify({ email, password, rememberMe }),
             });
 
-            const data = await response.text(); // API trả về chuỗi (JWT hoặc lỗi)
+            const data = await response.json();
             if (!response.ok) {
-                throw new Error(data || t('loginError') || 'Tài khoản hoặc mật khẩu không hợp lệ');
+                throw new Error(data.error || t('loginError') || 'Invalid credentials');
             }
 
-            localStorage.setItem('token', data);
+            localStorage.setItem('accessToken', data.accessToken);
+            localStorage.setItem('refreshToken', data.refreshToken);
             if (rememberMe) {
                 localStorage.setItem('rememberedEmail', email);
             } else {
                 localStorage.removeItem('rememberedEmail');
             }
 
-            navigate('/', { replace: true });
+            const token = await decodeToken(data.accessToken);
+
+            if (token.authorities.includes("ROLE_ADMIN") || token.authorities.includes("ROLE_SUPER_ADMIN")) {
+                navigate('/homepage', { replace: true });
+                console.log("admin")
+            } else if (token.authorities.includes("ROLE_USER")) {
+                navigate('/borrow', { replace: true });
+                console.log("user")
+            } else {
+                logout();
+            }
+
+            await refreshToken();
         } catch (err) {
-            console.error("Login error:", err);
+            console.error('Login error:', err);
             setError(err.message);
         } finally {
             setLoading(false);
@@ -76,19 +111,16 @@ export default function Login() {
     };
 
     const handleForgotPassword = () => {
-        // Implement the forgot password functionality here
-        // For example, navigate to forgot password page
         navigate('/forgot-password');
     };
 
     const handleInputChange = (e, setter) => {
         setter(e.target.value);
-        setValidationError(null); // Clear validation errors when user starts typing
-        setError(null); // Clear API errors as well
+        setValidationError(null);
+        setError(null);
     };
 
     useEffect(() => {
-        // Check if email was remembered from previous login
         const rememberedEmail = localStorage.getItem('rememberedEmail');
         if (rememberedEmail) {
             setEmail(rememberedEmail);
@@ -101,7 +133,6 @@ export default function Login() {
             <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
                 <h1 className="text-2xl font-bold text-center text-gray-900 mb-6">{t('login')}</h1>
 
-                {/* Display either validation error or API error */}
                 {(validationError || error) && (
                     <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded mb-4">
                         {validationError || error}
@@ -128,7 +159,7 @@ export default function Login() {
                         </label>
                         <div className="relative">
                             <input
-                                type={showPassword ? "text" : "password"}
+                                type={showPassword ? 'text' : 'password'}
                                 id="password"
                                 value={password}
                                 onChange={(e) => handleInputChange(e, setPassword)}
