@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle, XCircle, Loader2, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import 'react-loading-skeleton/dist/skeleton.css';
 import debounce from 'lodash.debounce';
 import { useNavigate } from 'react-router-dom';
@@ -15,11 +15,9 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
     const [selectedEquipment, setSelectedEquipment] = useState(null);
     const [selectedEquipmentItemId, setSelectedEquipmentItemId] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isBookingLater, setIsBookingLater] = useState(false);
-    const [borrowDetails, setBorrowDetails] = useState({
-        borrowDate: new Date().toISOString().slice(0, 16),
-        returnDate: new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().slice(0, 16),
-        note: '',
+    const [brokenDetails, setBrokenDetails] = useState({
+        brokenDate: new Date().toISOString().slice(0, 16), // Mặc định là thời gian hiện tại
+        description: '',
     });
     const [submitting, setSubmitting] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -348,20 +346,18 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
         }
     };
 
-    const openBorrowModal = (equipment) => {
+    const openBrokenModal = (equipment) => {
         setSelectedEquipment(equipment);
         setSelectedEquipmentItemId(null);
-        setIsBookingLater(true);
-        setBorrowDetails({
-            borrowDate: new Date().toISOString().slice(0, 16),
-            returnDate: new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().slice(0, 16),
-            note: '',
+        setBrokenDetails({
+            brokenDate: new Date().toISOString().slice(0, 16),
+            description: '',
         });
         fetchEquipmentItems(equipment.id);
         setIsModalOpen(true);
     };
 
-    const handleBorrowRequest = async () => {
+    const handleBrokenReport = async () => {
         if (!selectedEquipmentItemId) {
             alert(t('selectEquipmentItem'));
             return;
@@ -375,21 +371,19 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                 return;
             }
 
-            const borrowData = {
+            const brokenData = {
                 equipmentItemId: parseInt(selectedEquipmentItemId),
                 usersId: userId,
-                note: borrowDetails.note,
-                borrowDate: borrowDetails.borrowDate + ':00',
-                returnDate: borrowDetails.returnDate + ':00',
-                status: 'PENDING',
+                brokenDate: brokenDetails.brokenDate + ':00',
+                description: brokenDetails.description,
             };
-            const response = await fetch(`${BASE_URL}/borrowing/request`, {
+            const response = await fetch(`${BASE_URL}/broken/report`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${accessToken}`,
                 },
-                body: JSON.stringify(borrowData),
+                body: JSON.stringify(brokenData),
             });
 
             if (!response.ok) {
@@ -397,30 +391,30 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                     const refreshed = await refreshToken();
                     if (refreshed) {
                         accessToken = localStorage.getItem('accessToken');
-                        const retryResponse = await fetch(`${BASE_URL}/borrowing/request`, {
+                        const retryResponse = await fetch(`${BASE_URL}/broken/report`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
                                 'Authorization': `Bearer ${accessToken}`,
                             },
-                            body: JSON.stringify(borrowData),
+                            body: JSON.stringify(brokenData),
                         });
                         if (!retryResponse.ok) {
                             const errorText = await retryResponse.text();
-                            throw new Error(errorText || t('bookLaterError'));
+                            throw new Error(errorText || t('reportBrokenError'));
                         }
                     } else {
                         throw new Error(t('unauthorized'));
                     }
                 } else {
                     const errorText = await response.text();
-                    throw new Error(errorText || t('bookLaterError'));
+                    throw new Error(errorText || t('reportBrokenError'));
                 }
             }
 
             setIsModalOpen(false);
-            alert(t('bookLaterSuccess', { name: selectedEquipment.name }));
-            window.dispatchEvent(new Event('refreshBorrowingList'));
+            alert(t('reportBrokenSuccess', { name: selectedEquipment.name }));
+            fetchEquipmentItems(selectedEquipment.id); // Cập nhật danh sách thiết bị
         } catch (err) {
             alert(err.message);
         } finally {
@@ -428,15 +422,8 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
         }
     };
 
-    const isBorrowDateValid = () => {
-        if (!selectedEquipmentItemId) return true;
-        const selectedItem = equipmentItems[selectedEquipment?.id]?.find(
-            (item) => item.id === parseInt(selectedEquipmentItemId)
-        );
-        if (!selectedItem || !selectedItem.returnDate) {
-            return new Date(borrowDetails.borrowDate) >= new Date() && new Date(borrowDetails.returnDate) > new Date(borrowDetails.borrowDate);
-        }
-        return new Date(borrowDetails.borrowDate) >= new Date(selectedItem.returnDate) && new Date(borrowDetails.returnDate) > new Date(borrowDetails.borrowDate);
+    const isBrokenDateValid = () => {
+        return new Date(brokenDetails.brokenDate) <= new Date();
     };
 
     const formatReturnDate = (returnDate) => {
@@ -454,17 +441,6 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
             }).replace(',', '');
         } catch {
             return '-';
-        }
-    };
-
-    const formatReturnDateForInput = (returnDate) => {
-        if (!returnDate) return new Date().toISOString().slice(0, 16);
-        try {
-            const date = new Date(returnDate);
-            if (isNaN(date.getTime())) return new Date().toISOString().slice(0, 16);
-            return date.toISOString().slice(0, 16);
-        } catch {
-            return new Date().toISOString().slice(0, 16);
         }
     };
 
@@ -576,7 +552,6 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
         <div className="flex-1 bg-white p-6 rounded-lg shadow-md">
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold text-gray-900">{t('equipments')}</h2>
-                {/*<NotificationBell userId={userId} />*/}
             </div>
             {equipments.length > 0 || loading ? (
                 <div className="overflow-x-auto">
@@ -626,36 +601,34 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                                         {equipmentQuantities[equipment.id] !== undefined ? equipmentQuantities[equipment.id] : '-'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            <span className="flex items-center text-center space-x-1">
-                                                <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('ACTIVE')}`}>
-                                                    {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[0] : '0'}
-                                                </span>
-                                                <span className="text-gray-500">/</span>
-                                                <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('BROKEN')}`}>
-                                                    {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[1] : '0'}
-                                                </span>
-                                                <span className="text-gray-500">/</span>
-                                                <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('MAINTENANCE')}`}>
-                                                    {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[2] : '0'}
-                                                </span>
-                                                <span className="text-gray-500">/</span>
-                                                <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('BORROWED')}`}>
-                                                    {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[3] : '0'}
-                                                </span>
+                                        <span className="flex items-center text-center space-x-1">
+                                            <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('ACTIVE')}`}>
+                                                {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[0] : '0'}
                                             </span>
-                                        </td>
+                                            <span className="text-gray-500">/</span>
+                                            <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('BROKEN')}`}>
+                                                {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[1] : '0'}
+                                            </span>
+                                            <span className="text-gray-500">/</span>
+                                            <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('MAINTENANCE')}`}>
+                                                {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[2] : '0'}
+                                            </span>
+                                            <span className="text-gray-500">/</span>
+                                            <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('BORROWED')}`}>
+                                                {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[3] : '0'}
+                                            </span>
+                                        </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{equipment.categoryName || '-'}</td>
                                     <td className="px-6 py-4 text-sm text-gray-500">{equipment.description || '-'}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm flex space-x-2">
                                         <button
-                                            onClick={() => openBorrowModal(equipment)}
-                                            className="relative text-green-600 hover:text-green-800 group"
+                                            onClick={() => openBrokenModal(equipment)}
+                                            className="relative text-red-600 hover:text-red-800 group"
                                         >
-                                            <Calendar size={20} />
+                                            <AlertCircle size={20} />
                                             <span className="absolute hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2 -top-8 left-1/2 transform -translate-x-1/2">
-                                                {t('bookLater')}
+                                                {t('reportBroken')}
                                             </span>
                                         </button>
                                     </td>
@@ -737,9 +710,9 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
             {isModalOpen && (
                 <div className="fixed inset-0 bg-opacity-50 flex items-center justify-center z-50 bg-black/30">
                     <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md pointer-events-auto">
-                        <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('bookLaterEquipment')}</h2>
+                        <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('reportBrokenEquipment')}</h2>
                         <p className="text-gray-600 mb-4">
-                            {t('', { name: selectedEquipment?.name })}
+                            {t('reportingEquipment', { name: selectedEquipment?.name })}
                         </p>
                         <div className="mb-4">
                             <label className="block text-sm font-medium text-gray-700">{t('equipmentItem')}</label>
@@ -754,7 +727,7 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                                 >
                                     <option value="">{t('selectEquipmentItem')}</option>
                                     {equipmentItems[selectedEquipment?.id]
-                                        .filter((item) => item.status === 'ACTIVE')
+                                        .filter((item) => item.status !== 'BROKEN') // Chỉ hiển thị các mục chưa bị hỏng
                                         .map((item) => (
                                             <option key={`option-${item.id}`} value={item.id}>
                                                 {item.serialNumber} ({getTranslatedStatus(item.status)}, {item.locationName || 'No Location'})
@@ -766,62 +739,42 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                             )}
                         </div>
                         <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700">{t('bookingDate')}</label>
+                            <label className="block text-sm font-medium text-gray-700">{t('brokenDate')}</label>
                             <input
                                 type="datetime-local"
-                                value={borrowDetails.borrowDate}
-                                onChange={(e) => setBorrowDetails({ ...borrowDetails, borrowDate: e.target.value })}
-                                min={selectedEquipmentItemId
-                                    ? formatReturnDateForInput(
-                                        equipmentItems[selectedEquipment?.id]?.find(
-                                            (item) => item.id === parseInt(selectedEquipmentItemId)
-                                        )?.returnDate
-                                    )
-                                    : new Date().toISOString().slice(0, 16)
-                                }
+                                value={brokenDetails.brokenDate}
+                                onChange={(e) => setBrokenDetails({ ...brokenDetails, brokenDate: e.target.value })}
+                                max={new Date().toISOString().slice(0, 16)}
                                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                 required
                             />
-                            {isBookingLater && !isBorrowDateValid() && (
-                                <p className="text-red-600 text-sm mt-1">{t('invalidBookingDate')}</p>
+                            {!isBrokenDateValid() && (
+                                <p className="text-red-600 text-sm mt-1">{t('invalidBrokenDate')}</p>
                             )}
                         </div>
                         <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700">{t('returnDate')}</label>
-                            <input
-                                type="datetime-local"
-                                value={borrowDetails.returnDate}
-                                onChange={(e) => setBorrowDetails({ ...borrowDetails, returnDate: e.target.value })}
-                                min={borrowDetails.borrowDate}
-                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                required
-                            />
-                            {isBookingLater && !isBorrowDateValid() && (
-                                <p className="text-red-600 text-sm mt-1">{t('invalidReturnDate')}</p>
-                            )}
-                        </div>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700">{t('note')}</label>
+                            <label className="block text-sm font-medium text-gray-700">{t('description')}</label>
                             <textarea
-                                value={borrowDetails.note}
-                                onChange={(e) => setBorrowDetails({ ...borrowDetails, note: e.target.value })}
+                                value={brokenDetails.description}
+                                onChange={(e) => setBrokenDetails({ ...brokenDetails, description: e.target.value })}
                                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                 rows="4"
-                                placeholder={t('')}
+                                placeholder={t('brokenDescriptionPlaceholder')}
+                                required
                             />
                         </div>
                         <div className="flex justify-end space-x-4">
                             <button
-                                onClick={handleBorrowRequest}
+                                onClick={handleBrokenReport}
                                 className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-400"
-                                disabled={submitting || !selectedEquipmentItemId || !isBorrowDateValid()}
+                                disabled={submitting || !selectedEquipmentItemId || !isBrokenDateValid()}
                             >
                                 {submitting ? (
                                     <Loader2 size={20} className="mr-2 animate-spin" />
                                 ) : (
                                     <CheckCircle size={20} className="mr-2" />
                                 )}
-                                {t('confirm')}
+                                {t('submitReport')}
                             </button>
                             <button
                                 onClick={() => setIsModalOpen(false)}

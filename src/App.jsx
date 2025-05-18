@@ -14,17 +14,26 @@ import Login from './components/UTCManagement/User/Login.jsx';
 import ProtectedRoute from './components/UTCManagement/ProtectedRoute.jsx';
 import Borrow from "./components/Borrow/Borrow.jsx";
 import User from "./components/UTCManagement/User/User.jsx";
-
+import MaintenanceHistoryList from "./components/UTCManagement/Equipment/MaintenanceHistoryList.jsx";
+import Statistics from "./components/UTCManagement/Statistics/Statistics.jsx";
+import Broken from "./components/UTCManagement/Broken/Broken.jsx"
+import ResetPassword from "./components/ForgotPassword/ResetPassword.jsx";
+import ForgotPassword from "./components/ForgotPassword/ForgotPassword.jsx";
 function App() {
     const location = useLocation();
-    const isSpecialPage = ['/login', '/borrow'].includes(location.pathname);
+    const isSpecialPage = ['/login', '/borrow', '/forgot-password', '/reset-password'].includes(location.pathname);
     if (isSpecialPage) {
         return (
             <Routes>
                 <Route
                     path="/login"
                     element={<Login />} />
-
+                <Route path="/forgot-password"
+                       element={<ForgotPassword />}
+                />
+                <Route path="/reset-password"
+                       element={<ResetPassword />}
+                />
                 <Route
                     path="/borrow"
                     element={
@@ -82,6 +91,14 @@ function App() {
                         }
                     />
                     <Route
+                        path="/broken"
+                        element={
+                            <ProtectedRoute requiredAuthorities={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+                                <Broken />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
                         path="/location"
                         element={
                             <ProtectedRoute requiredAuthorities={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
@@ -105,6 +122,25 @@ function App() {
                             </ProtectedRoute>
                         }
                     />
+
+                    <Route
+                        path="/maintenance-history/:equipmentItemId"
+                        element={
+                            <ProtectedRoute requiredAuthorities={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+                                <MaintenanceHistoryList />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    <Route
+                        path="/statistics"
+                        element={
+                            <ProtectedRoute requiredAuthorities={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']}>
+                                <Statistics />
+                            </ProtectedRoute>
+                        }
+                    />
+
                 </Routes>
             </div>
             <Footer />

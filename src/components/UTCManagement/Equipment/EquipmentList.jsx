@@ -1,6 +1,6 @@
 import { useState, useEffect, Fragment } from 'react';
 import SearchBar from '../Nav/SearchBar.jsx';
-import { Pencil, Trash2, Plus, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { Pencil, Trash2, Plus, ChevronDown, ChevronUp, Loader2, History } from 'lucide-react';
 import AddEquipment from './AddEquipment.jsx';
 import EditEquipment from './EditEquipment.jsx';
 import DeleteEquipment from './DeleteEquipment.jsx';
@@ -9,13 +9,15 @@ import EditEquipmentItem from './EditEquipmentItem.jsx';
 import DeleteEquipmentItem from './DeleteEquipmentItem.jsx';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
-import { useAuth } from "../../Auth/AuthContext.jsx";
+import { useAuth } from '../../Auth/AuthContext.jsx';
+import { useNavigate } from 'react-router-dom';
 
 export default function EquipmentList() {
     const { t } = useTranslation();
+    const { fetchWithAuth } = useAuth();
+    const navigate = useNavigate();
     const [equipmentData, setEquipmentData] = useState([]);
     const [locations, setLocations] = useState([]);
-    const { fetchWithAuth } = useAuth();
     const [categories, setCategories] = useState([]);
     const [equipmentQuantities, setEquipmentQuantities] = useState({});
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -48,14 +50,12 @@ export default function EquipmentList() {
     const [error, setError] = useState(null);
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
-    const [pageSize] = useState(4);
+    const [pageSize] = useState(10);
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedEquipmentId, setExpandedEquipmentId] = useState(null);
     const [equipmentItems, setEquipmentItems] = useState({});
     const [itemsLoading, setItemsLoading] = useState({});
     const [renderKey, setRenderKey] = useState(0);
-
-    // State cho các bộ lọc (bỏ filterStatus)
     const [filterLocationId, setFilterLocationId] = useState('');
     const [filterCategoryId, setFilterCategoryId] = useState('');
 
@@ -99,7 +99,7 @@ export default function EquipmentList() {
             );
             setEquipmentData(equipmentList);
             setEquipmentQuantities(quantities);
-            setTotalPages(data.totalPages || 1);
+            setTotalPages(data.page.totalPages || 1);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -467,7 +467,7 @@ export default function EquipmentList() {
                     statusCount.BROKEN++;
                     break;
                 case 'MAINTENANCE':
-                    statusCount.MAINENANCE++;
+                    statusCount.MAINTENANCE++;
                     break;
                 case 'BORROWED':
                     statusCount.BORROWED++;
@@ -500,9 +500,7 @@ export default function EquipmentList() {
                     key={i}
                     onClick={() => handlePageChange(i)}
                     className={`px-3 py-1 rounded-md ${
-                        currentPage === i
-                            ? 'bg-black text-white'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        currentPage === i ? 'bg-black text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                     }`}
                 >
                     {i + 1}
@@ -591,6 +589,16 @@ export default function EquipmentList() {
         setSelectedEquipment((prev) => ({ ...prev, image: e.target.files[0] }));
     };
 
+    // Thêm hàm điều hướng khi nhấn "Xem lịch sử bảo trì"
+    const handleOpenMaintenanceHistory = (item) => {
+        if (!item || !item.id) {
+            console.error('Invalid equipment item:', item);
+            alert(t('error') + ': Invalid equipment item');
+            return;
+        }
+        navigate(`/maintenance-history/${item.id}`, { state: { serialNumber: item.serialNumber } });
+    };
+
     if (loading && equipmentData.length === 0) {
         return (
             <div className="min-h-screen p-6 flex items-center justify-center">
@@ -622,7 +630,6 @@ export default function EquipmentList() {
             <div className="mb-6 flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                     <SearchBar onSearch={handleSearch} />
-                    {/* Filter by Location */}
                     <select
                         value={filterLocationId}
                         onChange={(e) => handleFilterChange('location', e.target.value)}
@@ -635,8 +642,6 @@ export default function EquipmentList() {
                             </option>
                         ))}
                     </select>
-
-                    {/* Filter by Category */}
                     <select
                         value={filterCategoryId}
                         onChange={(e) => handleFilterChange('category', e.target.value)}
@@ -650,8 +655,6 @@ export default function EquipmentList() {
                         ))}
                     </select>
                 </div>
-
-                {/* Button Add Equipment */}
                 <button
                     className="flex items-center gap-2 bg-black text-white py-2 px-4 rounded-md hover:bg-gray-700 transition duration-200"
                     onClick={handleOpenAddModal}
@@ -709,23 +712,23 @@ export default function EquipmentList() {
                                     {equipmentQuantities[equipment.id] !== undefined ? equipmentQuantities[equipment.id] : '-'}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    <span className="flex items-center text-center space-x-1">
-                                        <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('ACTIVE')}`}>
-                                            {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[0] : '0'}
-                                        </span>
-                                        <span className="text-gray-500">/</span>
-                                        <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('BROKEN')}`}>
-                                            {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[1] : '0'}
-                                        </span>
-                                        <span className="text-gray-500">/</span>
-                                        <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('MAINTENANCE')}`}>
-                                            {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[2] : '0'}
-                                        </span>
-                                        <span className="text-gray-500">/</span>
-                                        <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('BORROWED')}`}>
-                                            {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[3] : '0'}
-                                        </span>
-                                    </span>
+                    <span className="flex items-center text-center space-x-1">
+                      <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('ACTIVE')}`}>
+                        {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[0] : '0'}
+                      </span>
+                      <span className="text-gray-500">/</span>
+                      <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('BROKEN')}`}>
+                        {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[1] : '0'}
+                      </span>
+                      <span className="text-gray-500">/</span>
+                      <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('MAINTENANCE')}`}>
+                        {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[2] : '0'}
+                      </span>
+                      <span className="text-gray-500">/</span>
+                      <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('BORROWED')}`}>
+                        {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[3] : '0'}
+                      </span>
+                    </span>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{equipment.categoryName}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{equipment.description || '-'}</td>
@@ -770,9 +773,9 @@ export default function EquipmentList() {
                                                         >
                                                             <div className="flex flex-col space-y-2">
                                                                 <div className="flex justify-between items-center">
-                                                                    <span className="text-sm font-medium text-gray-900">
-                                                                        {t('serialNumber')}: {item.serialNumber || '-'}
-                                                                    </span>
+                                    <span className="text-sm font-medium text-gray-900">
+                                      {t('serialNumber')}: {item.serialNumber || '-'}
+                                    </span>
                                                                     <div className="flex space-x-2">
                                                                         <button
                                                                             className="p-1 text-blue-700 rounded-md hover:bg-blue-100 transition duration-200"
@@ -786,14 +789,19 @@ export default function EquipmentList() {
                                                                         >
                                                                             <Trash2 size={14} />
                                                                         </button>
+                                                                        <button
+                                                                            className="p-1 text-purple-700 rounded-md hover:bg-purple-100 transition duration-200"
+                                                                            onClick={() => handleOpenMaintenanceHistory(item)}
+                                                                        >
+                                                                            <History size={14} />
+                                                                        </button>
                                                                     </div>
                                                                 </div>
                                                                 <span
                                                                     className={`inline-block px-2 py-1 text-xs font-medium rounded-full border w-fit ${getStatusColor(item.status)}`}
                                                                 >
-                                                                    {getTranslatedStatus(item.status) || '-'}
-                                                                </span>
-
+                                    {getTranslatedStatus(item.status) || '-'}
+                                  </span>
                                                                 <div className="text-sm text-gray-600">
                                                                     <span className="font-medium">{t('purchaseDate')}:</span> {formatDate(item.purchaseDate) || '-'}
                                                                 </div>

@@ -10,6 +10,8 @@ import users from '../../../assets/user.png';
 import locations from '../../../assets/location.png';
 import borrowIcon from '../../../assets/borrowing2.png';
 import userIcon from '../../../assets/user2.png';
+import statistics from '../../../assets/statistics.png';
+import broken from '../../../assets/broken2.png';
 import NavItem from './NavItem.jsx';
 import AuthModal from '../User/AuthModal.jsx';
 import { useTranslation } from 'react-i18next';
@@ -127,8 +129,10 @@ export default function NavBar() {
                             <NavItem to="/equipments" icon={equipment} label={t('equipment')} />
                             <NavItem to="/category" icon={category} label={t('category')} />
                             <NavItem to="/maintenance" icon={maintenance} label={t('maintenance')} />
-                            <NavItem to="/borrowing" icon={borrowing} label={t('borrowing')} />
+                            {/*<NavItem to="/borrowing" icon={borrowing} label={t('borrowing')} />*/}
+                            <NavItem to="/broken" icon={broken} label={t('brokenReport')} />
                             <NavItem to="/location" icon={locations} label={t('location')} />
+                            <NavItem to="/statistics" icon={statistics} label={t("statistics")} />
                             {/* Chỉ hiển thị NavItem "User" nếu là SUPER_ADMIN */}
                             {hasAuthority('ROLE_SUPER_ADMIN') && (
                                 <NavItem to="/user" icon={userIcon} label={t('user')} />

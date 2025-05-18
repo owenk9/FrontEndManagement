@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Search, User, LogOut } from 'lucide-react';
-import NotificationBell from './NotificationBell';
 import { Edit, Eye, EyeOff } from 'lucide-react';
 
 export default function Header({ searchQuery, setSearchQuery, setUserId }) {
@@ -156,7 +155,6 @@ export default function Header({ searchQuery, setSearchQuery, setUserId }) {
     return (
         <header className="bg-white shadow-md p-4 flex justify-between items-center">
             <div className="flex items-center space-x-4">
-                <h1 className="text-xl font-bold text-gray-900">{t('borrow')}</h1>
                 <div className="relative">
                     <input
                         type="text"
@@ -172,7 +170,6 @@ export default function Header({ searchQuery, setSearchQuery, setUserId }) {
                 {userData && (
                     <>
                         <div className="pt-3">
-                            <NotificationBell userId={userData.id} />
                         </div>
                         <div className="relative">
                             <button
