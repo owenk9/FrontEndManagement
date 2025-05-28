@@ -1,18 +1,21 @@
-import {useState, useEffect, Fragment} from 'react';
+import { useState, useEffect, useCallback, Fragment } from 'react';
 import SearchBar from '../Nav/SearchBar.jsx';
-import {Pencil, Trash2, Plus, ChevronDown, ChevronUp, Loader2} from 'lucide-react';
+import { Pencil, Trash2, Plus, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import AddLocation from './AddLocation.jsx';
 import EditLocation from './EditLocation.jsx';
 import DeleteLocation from './DeleteLocation.jsx';
-import {useTranslation} from 'react-i18next';
-import {format} from 'date-fns';
-import {useAuth} from "../../Auth/AuthContext.jsx";
+import { useTranslation } from 'react-i18next';
+import { format } from 'date-fns';
+import { useAuth } from "../../Auth/AuthContext.jsx";
+import debounce from 'lodash.debounce';
+import { useNavigate } from 'react-router-dom';
 
-export default function Location() {
-    const {t} = useTranslation();
+export default function Location({ searchQuery: propSearchQuery = '', filterParams = {} }) {
+    const { t } = useTranslation();
+    useNavigate();
+    const { fetchWithAuth } = useAuth();
 
     const [locationData, setLocationData] = useState([]);
-    const {fetchWithAuth} = useAuth();
     const [equipmentItems, setEquipmentItems] = useState({});
     const [equipmentCounts, setEquipmentCounts] = useState({});
     const [itemsLoading, setItemsLoading] = useState({});
@@ -25,38 +28,49 @@ export default function Location() {
         locationName: '',
         equipments: '',
     });
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
     const [pageSize] = useState(10);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchQuery, setSearchQuery] = useState(propSearchQuery);
     const [expandedLocationId, setExpandedLocationId] = useState(null);
 
     const BASE_URL = 'http://localhost:9090';
 
-    const fetchLocationData = async (page = 0, search = '') => {
+    const fetchLocationData = useCallback(async (page = 0) => {
         try {
             setLoading(true);
-            const url = search
-                ? `${BASE_URL}/location/get?name=${encodeURIComponent(search)}&page=${page}&size=${pageSize}`
-                : `${BASE_URL}/location/get?page=${page}&size=${pageSize}`;
+            let url = `${BASE_URL}/location/get?page=${page}&size=${pageSize}`;
+            if (searchQuery && searchQuery.trim() !== '') {
+                url = `${BASE_URL}/location/get?page=${page}&size=${pageSize}&name=${encodeURIComponent(searchQuery)}`;
+            }
+            if (filterParams.filterLocation) url += `&locationId=${filterParams.filterLocation}`;
+
+            console.log('Fetching URL:', url);
             const response = await fetchWithAuth(url, {
                 method: 'GET',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
             });
-            if (!response.ok) throw new Error(t('fetchError'));
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                if (response.status === 401 || response.status === 403) {
+                    throw new Error(`${t('unauthorized')}: ${errorText}`);
+                }
+                throw new Error(`${t('fetchError')}: ${errorText}`);
+            }
+
             const data = await response.json();
             const locationList = data.content || [];
 
-            // Fetch equipment counts for each location
             const counts = {};
             await Promise.all(
                 locationList.map(async (location) => {
                     try {
                         const itemResponse = await fetchWithAuth(`${BASE_URL}/item/get?locationId=${location.id}`, {
                             method: 'GET',
-                            headers: {'Content-Type': 'application/json'},
+                            headers: { 'Content-Type': 'application/json' },
                         });
                         if (!itemResponse.ok) {
                             console.error(`Failed to fetch items for location ${location.id}`);
@@ -74,22 +88,28 @@ export default function Location() {
 
             setLocationData(locationList);
             setEquipmentCounts(counts);
-            setTotalPages(data.page.totalPages || 1);
+            setTotalPages(data.totalPages || 1);
         } catch (err) {
+            console.error('Fetch location error:', err);
             setError(err.message);
+            setLocationData([]);
+            setTotalPages(1);
         } finally {
             setLoading(false);
         }
-    };
+    }, [fetchWithAuth, searchQuery, pageSize, filterParams.filterLocation, t]); // Chỉ phụ thuộc vào filterLocation cụ thể
 
-    const fetchEquipmentItems = async (locationId) => {
+    const fetchEquipmentItems = useCallback(async (locationId) => {
         try {
-            setItemsLoading((prev) => ({...prev, [locationId]: true}));
+            setItemsLoading((prev) => ({ ...prev, [locationId]: true }));
             const response = await fetchWithAuth(`${BASE_URL}/item/get?locationId=${locationId}`, {
                 method: 'GET',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
             });
-            if (!response.ok) throw new Error(t('fetchError'));
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`${t('fetchError')}: ${errorText}`);
+            }
             const data = await response.json();
             setEquipmentItems((prev) => ({
                 ...prev,
@@ -101,21 +121,41 @@ export default function Location() {
             }));
         } catch (err) {
             console.error(`Failed to fetch equipment items for location ${locationId}:`, err);
+            setError(err.message);
         } finally {
-            setItemsLoading((prev) => ({...prev, [locationId]: false}));
+            setItemsLoading((prev) => ({ ...prev, [locationId]: false }));
         }
-    };
+    }, [fetchWithAuth, t]);
 
-    const handleSearch = (term) => {
-        setSearchTerm(term);
+    const debouncedFetchLocationData = useCallback(
+        debounce((page) => {
+            console.log('Debounced fetch triggered for page:', page, 'with searchQuery:', searchQuery);
+            fetchLocationData(page);
+        }, 200),
+        [fetchLocationData]
+    );
+
+    const handleSearch = (query) => {
+        console.log('Search query updated:', query);
+        setSearchQuery(query);
         setCurrentPage(0);
-        fetchLocationData(0, term);
     };
 
     useEffect(() => {
+        console.log('First useEffect triggered with searchQuery:', searchQuery, 'filterParams:', filterParams);
         setLoading(true);
-        fetchLocationData(currentPage, searchTerm);
-    }, [currentPage, searchTerm]);
+        setCurrentPage(0);
+        debouncedFetchLocationData(0);
+        return () => debouncedFetchLocationData.cancel();
+    }, [searchQuery, filterParams.filterLocation]); // Loại bỏ debouncedFetchLocationData khỏi phụ thuộc
+
+    useEffect(() => {
+        console.log('Second useEffect triggered with currentPage:', currentPage);
+        if (currentPage !== 0) {
+            debouncedFetchLocationData(currentPage);
+        }
+        return () => debouncedFetchLocationData.cancel();
+    }, [currentPage]); // Loại bỏ debouncedFetchLocationData khỏi phụ thuộc
 
     const handleOpenAddLocationModal = () => {
         setIsAddLocationModalOpen(true);
@@ -129,7 +169,7 @@ export default function Location() {
         try {
             const response = await fetchWithAuth(`${BASE_URL}/location/add`, {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     locationName: newLocationData.locationName,
                 }),
@@ -138,17 +178,17 @@ export default function Location() {
                 const errorText = await response.text();
                 throw new Error(t('addError') + ': ' + errorText);
             }
-            setNewLocationData({locationName: '', equipments: ''});
+            setNewLocationData({ locationName: '', equipments: '' });
             setIsAddLocationModalOpen(false);
-            fetchLocationData(currentPage, searchTerm);
+            fetchLocationData(currentPage);
         } catch (err) {
             console.error("Failed to add location", err);
-            alert(t('err.message'));
+            alert(err.message);
         }
     };
 
     const handleOpenEditModal = (location) => {
-        setSelectedLocation({...location});
+        setSelectedLocation({ ...location });
         setIsEditModalOpen(true);
     };
 
@@ -160,7 +200,7 @@ export default function Location() {
         try {
             const response = await fetchWithAuth(`${BASE_URL}/location/update/${selectedLocation.id}`, {
                 method: 'PATCH',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     locationName: selectedLocation.locationName,
                 }),
@@ -171,10 +211,10 @@ export default function Location() {
             }
             setIsEditModalOpen(false);
             setSelectedLocation(null);
-            fetchLocationData(currentPage, searchTerm);
+            fetchLocationData(currentPage);
         } catch (err) {
-            console.error(`Failed to update location :`, err);
-            alert(t('err.message'));
+            console.error(`Failed to update location:`, err);
+            alert(err.message);
         }
     };
 
@@ -187,7 +227,7 @@ export default function Location() {
         try {
             const response = await fetchWithAuth(`${BASE_URL}/location/delete/${locationToDelete.id}`, {
                 method: 'DELETE',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
             });
             if (!response.ok) {
                 const errorText = await response.text();
@@ -195,21 +235,21 @@ export default function Location() {
             }
             setIsDeleteModalOpen(false);
             setLocationToDelete(null);
-            fetchLocationData(currentPage, searchTerm);
+            fetchLocationData(currentPage);
         } catch (err) {
-            console.error(`Failed to delete location :`, err);
-            alert(t('err.message'));
+            console.error(`Failed to delete location:`, err);
+            alert(err.message);
         }
     };
 
     const handleLocationInputChange = (e) => {
-        const {name, value} = e.target;
-        setNewLocationData((prev) => ({...prev, [name]: value}));
+        const { name, value } = e.target;
+        setNewLocationData((prev) => ({ ...prev, [name]: value }));
     };
 
     const handleEditInputChange = (e) => {
-        const {name, value} = e.target;
-        setSelectedLocation((prev) => ({...prev, [name]: value}));
+        const { name, value } = e.target;
+        setSelectedLocation((prev) => ({ ...prev, [name]: value }));
     };
 
     const toggleRowExpansion = (locationId) => {
@@ -306,19 +346,16 @@ export default function Location() {
         return pageNumbers;
     };
 
-    if (loading && locationData.length === 0) {
-        return (
-            <div className="min-h-screen p-6 min-w-full flex items-center justify-center">
-                <Loader2 size={24} className="animate-spin mr-2"/>
-                <p>{t('loading')}</p>
-            </div>
-        );
-    }
-
     if (error) {
         return (
             <div className="min-h-screen p-6 min-w-full flex items-center justify-center">
                 <p className="text-red-600">{t('error')}: {error}</p>
+                <button
+                    onClick={() => fetchLocationData(0)}
+                    className="ml-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                    {t('retry')}
+                </button>
             </div>
         );
     }
@@ -329,12 +366,12 @@ export default function Location() {
                 <h1 className="text-3xl font-bold text-gray-900">{t('locations')}</h1>
             </div>
             <div className="mb-6 flex justify-between items-center">
-                <SearchBar onSearch={handleSearch}/>
+                <SearchBar onSearch={handleSearch} />
                 <button
                     className="flex items-center gap-2 bg-black text-white py-2 px-4 rounded-md hover:bg-gray-700 transition duration-200"
                     onClick={handleOpenAddLocationModal}
                 >
-                    <Plus size={16}/>
+                    <Plus size={16} />
                     {t('addLocation')}
                 </button>
             </div>
@@ -349,109 +386,115 @@ export default function Location() {
                     </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                    {locationData.map((location) => (
-                        <Fragment key={location.id}>
-                            <tr className="hover:bg-gray-50">
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{location.id}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{location.locationName}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
-                                    <button
-                                        onClick={() => toggleRowExpansion(location.id)}
-                                        className="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 font-medium rounded-md shadow-sm hover:bg-blue-100 hover:scale-105 active:scale-95 transition-all duration-200"
-                                    >
-                                        {equipmentCounts[location.id] !== undefined ? equipmentCounts[location.id] : 0} {t('equipments')}
-                                        {expandedLocationId === location.id ? <ChevronUp size={20}/> :
-                                            <ChevronDown size={20}/>}
-                                    </button>
-                                </td>
-                                <td className="py-4 px-6 text-center w-[150px]">
-                                    <div className="flex space-x-3">
+                    {loading && locationData.length === 0 ? (
+                        <tr>
+                            <td colSpan="4" className="py-4 text-center text-gray-600">
+                                {t('loading')}...
+                            </td>
+                        </tr>
+                    ) : locationData.length > 0 ? (
+                        locationData.map((location) => (
+                            <Fragment key={location.id}>
+                                <tr className="hover:bg-gray-50">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{location.id}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{location.locationName}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
                                         <button
-                                            onClick={() => handleOpenEditModal(location)}
-                                            className="p-2 text-blue-700 font-bold rounded-md hover:bg-blue-600 hover:text-white transition duration-200 cursor-pointer"
+                                            onClick={() => toggleRowExpansion(location.id)}
+                                            className="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 font-medium rounded-md shadow-sm hover:bg-blue-100 hover:scale-105 active:scale-95 transition-all duration-200"
                                         >
-                                            <Pencil size={16}/>
+                                            {equipmentCounts[location.id] !== undefined ? equipmentCounts[location.id] : 0} {t('equipments')}
+                                            {expandedLocationId === location.id ? <ChevronUp size={20} /> :
+                                                <ChevronDown size={20} />}
                                         </button>
-                                        <button
-                                            onClick={() => handleOpenDeleteModal(location)}
-                                            className="px-2 py-1 text-red-700 font-bold rounded-md hover:bg-red-500 hover:text-white transition duration-200 cursor-pointer"
-                                        >
-                                            <Trash2 size={16}/>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            {expandedLocationId === location.id && (
-                                <tr className="bg-gray-50">
-                                    <td colSpan="8" className="p-4">
-                                        {itemsLoading[location.id] ? (
-                                            <div className="flex justify-center items-center py-4">
-                                                <Loader2 size={24} className="animate-spin text-gray-600"/>
-                                                <span className="ml-2 text-gray-600">{t('loading')}...</span>
-                                            </div>
-                                        ) : equipmentItems[location.id]?.length > 0 ? (
-                                            <div
-                                                className="max-h-80 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                                                <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-2">
-                                                    {equipmentItems[location.id].map((item, index) => (
-                                                        <div
-                                                            key={`item-${item.id}`}
-                                                            className={`p-4 bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-gray-100 transition-colors duration-200 ${
-                                                                index < equipmentItems[location.id].length - 1 ? 'border-b border-gray-200' : ''
-                                                            }`}
-                                                        >
-                                                            <div className="flex flex-col space-y-2">
-                                                                <div className="flex justify-between items-start">
-                                                                    <div className="flex flex-col">
-                                                                        <span className="text-sm font-medium  text-gray-900">
-                                                                            {t('equipmentName')}: {item.equipmentName}
-                                                                        </span>
-                                                                        <span
-                                                                            className="text-sm font-medium pt-3 text-gray-900">
-                                                                            {t('serialNumber')}: {item.serialNumber}
-                                                                        </span>
-                                                                    </div>
-                                                                    <span
-                                                                        className={`inline-block px-3 py-1 text-xs font-medium rounded-full border ${getStatusColor(
-                                                                            item.status
-                                                                        )}`}
-                                                                    >
-                                                                        {getTranslatedStatus(item.status)}
-                                                                    </span>
-                                                                </div>
-
-                                                                <div className="text-sm text-gray-600">
-                                                                    <span
-                                                                        className="font-medium">{t('location')}:</span> {item.locationName || '-'}
-                                                                </div>
-
-                                                                {item.returnDate && (
-                                                                    <div className="text-sm text-gray-600">
-                                                                        <span
-                                                                            className="font-medium">{t('returnDate')}:</span> {formatDate(item.returnDate)}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <p className="text-gray-600 text-center py-4">{t('noEquipment')}</p>
-                                        )}
+                                    </td>
+                                    <td className="py-4 px-6 text-center w-[150px]">
+                                        <div className="flex space-x-3">
+                                            <button
+                                                onClick={() => handleOpenEditModal(location)}
+                                                className="p-2 text-blue-700 font-bold rounded-md hover:bg-blue-600 hover:text-white transition duration-200 cursor-pointer"
+                                            >
+                                                <Pencil size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleOpenDeleteModal(location)}
+                                                className="px-2 py-1 text-red-700 font-bold rounded-md hover:bg-red-500 hover:text-white transition duration-200 cursor-pointer"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
-                            )}
-                        </Fragment>
-                    ))}
+                                {expandedLocationId === location.id && (
+                                    <tr className="bg-gray-50">
+                                        <td colSpan="4" className="p-4">
+                                            {itemsLoading[location.id] ? (
+                                                <div className="flex justify-center items-center py-4">
+                                                    <Loader2 size={24} className="animate-spin text-gray-600" />
+                                                    <span className="ml-2 text-gray-600">{t('loading')}...</span>
+                                                </div>
+                                            ) : equipmentItems[location.id]?.length > 0 ? (
+                                                <div
+                                                    className="max-h-80 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                                                    <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-2">
+                                                        {equipmentItems[location.id].map((item, index) => (
+                                                            <div
+                                                                key={`item-${item.id}`}
+                                                                className={`p-4 bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-gray-100 transition-colors duration-200 ${
+                                                                    index < equipmentItems[location.id].length - 1 ? 'border-b border-gray-200' : ''
+                                                                }`}
+                                                            >
+                                                                <div className="flex flex-col space-y-2">
+                                                                    <div className="flex justify-between items-start">
+                                                                        <div className="flex flex-col">
+                                                                            <span className="text-sm font-medium text-gray-900">
+                                                                                {t('equipmentName')}: {item.equipmentName}
+                                                                            </span>
+                                                                            <span
+                                                                                className="text-sm font-medium pt-3 text-gray-900">
+                                                                                {t('serialNumber')}: {item.serialNumber}
+                                                                            </span>
+                                                                        </div>
+                                                                        <span
+                                                                            className={`inline-block px-3 py-1 text-xs font-medium rounded-full border ${getStatusColor(
+                                                                                item.status
+                                                                            )}`}
+                                                                        >
+                                                                            {getTranslatedStatus(item.status)}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="text-sm text-gray-600">
+                                                                        <span
+                                                                            className="font-medium">{t('location')}:</span> {item.locationName || '-'}
+                                                                    </div>
+                                                                    {item.returnDate && (
+                                                                        <div className="text-sm text-gray-600">
+                                                                            <span
+                                                                                className="font-medium">{t('returnDate')}:</span> {formatDate(item.returnDate)}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <p className="text-gray-600 text-center py-4">{t('noEquipment')}</p>
+                                            )}
+                                        </td>
+                                    </tr>
+                                )}
+                            </Fragment>
+                        ))
+                    ) : (
+                        <tr>
+                            <td colSpan="4" className="py-4 text-center text-gray-600">
+                                {t('noLocations')}
+                            </td>
+                        </tr>
+                    )}
                     </tbody>
                 </table>
-                {!loading && !error && locationData.length === 0 && (
-                    <div className="flex justify-center items-center py-4">
-                        <p className="text-gray-600 text-center">{t('noLocations')}</p>
-                    </div>
-                )}
                 <div className="flex justify-end items-center p-4">
                     <div className="flex gap-2">
                         <button
@@ -459,7 +502,7 @@ export default function Location() {
                                 currentPage === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-700'
                             }`}
                             onClick={() => handlePageChange(currentPage - 1)}
-                            disabled={currentPage === 0}
+                            disabled={currentPage === 0 || loading}
                         >
                             {t('previous')}
                         </button>
@@ -469,7 +512,7 @@ export default function Location() {
                                 currentPage === totalPages - 1 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-700'
                             }`}
                             onClick={() => handlePageChange(currentPage + 1)}
-                            disabled={currentPage === totalPages - 1}
+                            disabled={currentPage === totalPages - 1 || loading}
                         >
                             {t('next')}
                         </button>

@@ -261,7 +261,8 @@ i18n
                     invalidOrExpiredToken: "The reset link is invalid or has expired.",
                     noTokenProvided: "No reset token provided.",
                     tryAgain: "Try Again",
-                    resetting: "Resetting..."
+                    resetting: "Resetting...",
+                    reportBrokenEquipment: "Broken report",
                 },
             },
             vi: {

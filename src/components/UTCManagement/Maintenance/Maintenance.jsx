@@ -1,15 +1,16 @@
-import {useState, useEffect} from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import SearchBar from '../Nav/SearchBar.jsx';
-import {Pencil, Trash2, Plus} from 'lucide-react';
+import { Pencil, Trash2, Plus } from 'lucide-react';
 import AddMaintenance from './AddMaintenance.jsx';
 import EditMaintenance from './EditMaintenance.jsx';
 import DeleteMaintenance from './DeleteMaintenance.jsx';
-import {useTranslation} from 'react-i18next';
-import {format} from 'date-fns';
-import {useAuth} from "../../Auth/AuthContext.jsx";
+import { useTranslation } from 'react-i18next';
+import { format } from 'date-fns';
+import { useAuth } from "../../Auth/AuthContext.jsx";
+import debounce from 'lodash.debounce';
 
 export default function Maintenance() {
-    const {t} = useTranslation();
+    const { t } = useTranslation();
     const { fetchWithAuth } = useAuth();
 
     const [maintenanceData, setMaintenanceData] = useState([]);
@@ -27,12 +28,12 @@ export default function Maintenance() {
     });
     const [selectedMaintenance, setSelectedMaintenance] = useState(null);
     const [maintenanceToDelete, setMaintenanceToDelete] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false); // Aligned with BorrowTable's initial loading state
     const [error, setError] = useState(null);
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
     const [pageSize] = useState(10);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchQuery, setSearchQuery] = useState(''); // Changed to searchQuery to match BorrowTable
 
     const BASE_URL = 'http://localhost:9090';
 
@@ -46,12 +47,15 @@ export default function Maintenance() {
         return formatter.format(value).replace('₫', 'đ');
     };
 
-
-    const fetchMaintenanceData = async (page = 0, search = '') => {
+    const fetchMaintenanceData = useCallback(async (page = 0) => {
         try {
             setLoading(true);
             let url = `${BASE_URL}/maintenance/get?page=${page}&size=${pageSize}`;
-            if (search) url += `&name=${encodeURIComponent(search)}`;
+            if (searchQuery && searchQuery.trim() !== '') {
+                url = `${BASE_URL}/maintenance/search?page=${page}&size=${pageSize}&name=${encodeURIComponent(searchQuery)}`;
+            }
+
+            console.log('Fetching maintenance data with URL:', url);
             const response = await fetchWithAuth(url, {
                 method: 'GET',
                 headers: {
@@ -59,15 +63,25 @@ export default function Maintenance() {
                     'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
                 },
             });
-            if (!response.ok) throw new Error(t('fetchError'));
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`${t('fetchError')}: ${errorText}`);
+            }
+
             const data = await response.json();
             const maintenanceList = data.content || [];
 
             const itemResponse = await fetchWithAuth(`${BASE_URL}/item/get?page=0&size=100`, {
                 method: 'GET',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
             });
-            if (!itemResponse.ok) throw new Error(t('fetchError'));
+
+            if (!itemResponse.ok) {
+                const errorText = await itemResponse.text();
+                throw new Error(`${t('fetchError')}: ${errorText}`);
+            }
+
             const itemsData = await itemResponse.json();
             const itemsContent = itemsData.content || itemsData;
             const itemsMap = Array.isArray(itemsContent) ? itemsContent.reduce((map, item) => {
@@ -87,44 +101,69 @@ export default function Maintenance() {
             setMaintenanceData(enrichedMaintenance);
             setTotalPages(data.totalPages || 1);
         } catch (err) {
+            console.error('Fetch maintenance data error:', err);
             setError(err.message);
+            setMaintenanceData([]);
+            setTotalPages(1);
         } finally {
             setLoading(false);
         }
-    };
+    }, [fetchWithAuth, pageSize, searchQuery, t]);
 
     const fetchEquipmentItems = async () => {
         try {
             const response = await fetchWithAuth(`${BASE_URL}/item/get?page=0&size=100`, {
                 method: 'GET',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
             });
-            if (!response.ok) throw new Error(t('fetchError'));
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`${t('fetchError')}: ${errorText}`);
+            }
             const data = await response.json();
             setEquipmentItems(data.content || data || []);
         } catch (err) {
             console.error('Failed to fetch equipment items:', err);
+            setError(err.message);
         }
     };
 
-    const handleSearch = (term) => {
-        setSearchTerm(term);
+    const debouncedFetchMaintenanceData = useCallback(
+        debounce((page) => {
+            console.log('Debounced fetch triggered for page:', page);
+            fetchMaintenanceData(page);
+        }, 200),
+        [fetchMaintenanceData]
+    );
+
+    const handleSearch = (query) => {
+        setSearchQuery(query);
+        setCurrentPage(0); // Reset to first page on new search
     };
 
     useEffect(() => {
         setLoading(true);
-        fetchMaintenanceData(currentPage, searchTerm);
-    }, [currentPage, searchTerm]);
+        setCurrentPage(0);
+        debouncedFetchMaintenanceData(0);
+        return () => debouncedFetchMaintenanceData.cancel();
+    }, [searchQuery, debouncedFetchMaintenanceData]);
+
+    useEffect(() => {
+        if (currentPage !== 0) {
+            debouncedFetchMaintenanceData(currentPage);
+        }
+        return () => debouncedFetchMaintenanceData.cancel();
+    }, [currentPage, debouncedFetchMaintenanceData]);
 
     useEffect(() => {
         fetchEquipmentItems();
-    }, []);
+    }, [fetchWithAuth]);
 
     const handleAddMaintenance = async () => {
         try {
             const response = await fetchWithAuth(`${BASE_URL}/maintenance/add`, {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     equipmentItemId: parseInt(newMaintenanceData.equipmentItemId),
                     maintenanceDate: newMaintenanceData.maintenanceDate,
@@ -147,7 +186,7 @@ export default function Maintenance() {
                 technician: '',
             });
             setIsAddModalOpen(false);
-            fetchMaintenanceData(currentPage, searchTerm);
+            fetchMaintenanceData(currentPage);
         } catch (err) {
             alert(err.message);
         }
@@ -161,7 +200,7 @@ export default function Maintenance() {
         try {
             const response = await fetchWithAuth(`${BASE_URL}/maintenance/update/${selectedMaintenance.id}`, {
                 method: 'PATCH',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     equipmentItemId: parseInt(selectedMaintenance.equipmentItemId),
                     maintenanceDate: selectedMaintenance.maintenanceDate,
@@ -177,7 +216,7 @@ export default function Maintenance() {
             }
             setIsEditModalOpen(false);
             setSelectedMaintenance(null);
-            fetchMaintenanceData(currentPage, searchTerm);
+            fetchMaintenanceData(currentPage);
         } catch (err) {
             alert(err.message);
         }
@@ -187,7 +226,7 @@ export default function Maintenance() {
         try {
             const response = await fetchWithAuth(`${BASE_URL}/maintenance/delete/${maintenanceToDelete.id}`, {
                 method: 'DELETE',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
             });
             if (!response.ok) {
                 const errorText = await response.text();
@@ -195,7 +234,7 @@ export default function Maintenance() {
             }
             setIsDeleteModalOpen(false);
             setMaintenanceToDelete(null);
-            fetchMaintenanceData(currentPage, searchTerm);
+            fetchMaintenanceData(currentPage);
         } catch (err) {
             alert(err.message);
         }
@@ -229,7 +268,7 @@ export default function Maintenance() {
             default:
                 return status;
         }
-    }
+    };
 
     const handlePageChange = (page) => {
         if (page >= 0 && page < totalPages && page !== currentPage) {
@@ -281,18 +320,25 @@ export default function Maintenance() {
         setIsDeleteModalOpen(true);
     };
     const handleAddInputChange = (e) => {
-        const {name, value} = e.target;
-        setNewMaintenanceData((prev) => ({...prev, [name]: value}));
+        const { name, value } = e.target;
+        setNewMaintenanceData((prev) => ({ ...prev, [name]: value }));
     };
     const handleEditInputChange = (e) => {
-        const {name, value} = e.target;
-        setSelectedMaintenance((prev) => ({...prev, [name]: value}));
+        const { name, value } = e.target;
+        setSelectedMaintenance((prev) => ({ ...prev, [name]: value }));
     };
 
-    if (loading) return <div className="min-h-screen p-6 min-w-full flex items-center justify-center">
-        <p>{t('loading')}</p></div>;
-    if (error) return <div className="min-h-screen p-6 min-w-full flex items-center justify-center"><p
-        className="text-red-600">{t('error')}: {error}</p></div>;
+    if (error) return (
+        <div className="min-h-screen p-6 min-w-full flex items-center justify-center">
+            <p className="text-red-600">{t('error')}: {error}</p>
+            <button
+                onClick={() => fetchMaintenanceData(0)}
+                className="ml-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+                {t('retry')}
+            </button>
+        </div>
+    );
 
     return (
         <div className="min-h-screen p-6 min-w-full overflow-auto">
@@ -300,12 +346,12 @@ export default function Maintenance() {
                 <h1 className="text-3xl font-bold text-gray-900">{t('maintenance')}</h1>
             </div>
             <div className="mb-6 flex justify-between items-center">
-                <SearchBar onSearch={handleSearch}/>
+                <SearchBar onSearch={handleSearch} />
                 <button
                     className="flex items-center gap-2 bg-black text-white py-2 px-4 rounded-md hover:bg-gray-700 transition duration-200"
                     onClick={handleOpenAddModal}
                 >
-                    <Plus size={16}/>
+                    <Plus size={16} />
                     {t('addMaintenance')}
                 </button>
             </div>
@@ -325,46 +371,60 @@ export default function Maintenance() {
                     </tr>
                     </thead>
                     <tbody>
-                    {maintenanceData.map((maintenance) => (
-                        <tr key={maintenance.id} className="border-t border-gray-200 hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">{maintenance.id}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">{maintenance.equipmentName}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">{maintenance.serialNumber}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                {maintenance.maintenanceDate
-                                    ? format(new Date(maintenance.maintenanceDate), 'dd/MM/yyyy HH:mm')
-                                    : t('noDate')}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">{maintenance.description || 'N/A'}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                <span
-                                    className={`inline-block px-3 py-1 text-sm font-medium rounded-full border ${getStatusColor(
-                                        maintenance.status
-                                    )}`}
-                                >
-                                    {getTranslatedStatus(maintenance.status)}
-                                </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">{formatCurrency(maintenance.cost)}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">{maintenance.technician || 'N/A'}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                <div className="flex justify-center gap-3">
-                                    <button
-                                        onClick={() => handleOpenEditModal(maintenance)}
-                                        className="p-2 text-blue-700 font-bold rounded-md hover:bg-blue-600 hover:text-white transition duration-200 cursor-pointer"
-                                    >
-                                        <Pencil size={16}/>
-                                    </button>
-                                    <button
-                                        onClick={() => handleOpenDeleteModal(maintenance)}
-                                        className="px-2 py-1 text-red-700 font-bold rounded-md hover:bg-red-500 hover:text-white transition duration-200 cursor-pointer"
-                                    >
-                                        <Trash2 size={16}/>
-                                    </button>
-                                </div>
+                    {loading ? (
+                        <tr>
+                            <td colSpan="9" className="py-4 text-center text-gray-600">
+                                {t('loading')}...
                             </td>
                         </tr>
-                    ))}
+                    ) : maintenanceData.length > 0 ? (
+                        maintenanceData.map((maintenance) => (
+                            <tr key={maintenance.id} className="border-t border-gray-200 hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">{maintenance.id}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">{maintenance.equipmentName}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">{maintenance.serialNumber}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                    {maintenance.maintenanceDate
+                                        ? format(new Date(maintenance.maintenanceDate), 'dd/MM/yyyy HH:mm')
+                                        : t('noDate')}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">{maintenance.description || 'N/A'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                    <span
+                                        className={`inline-block px-3 py-1 text-sm font-medium rounded-full border ${getStatusColor(
+                                            maintenance.status
+                                        )}`}
+                                    >
+                                        {getTranslatedStatus(maintenance.status)}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">{formatCurrency(maintenance.cost)}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">{maintenance.technician || 'N/A'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                    <div className="flex justify-center gap-3">
+                                        <button
+                                            onClick={() => handleOpenEditModal(maintenance)}
+                                            className="p-2 text-blue-700 font-bold rounded-md hover:bg-blue-600 hover:text-white transition duration-200 cursor-pointer"
+                                        >
+                                            <Pencil size={16} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleOpenDeleteModal(maintenance)}
+                                            className="px-2 py-1 text-red-700 font-bold rounded-md hover:bg-red-500 hover:text-white transition duration-200 cursor-pointer"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))
+                    ) : (
+                        <tr>
+                            <td colSpan="9" className="py-4 text-center text-gray-600">
+                                {t('noMaintenanceData')}
+                            </td>
+                        </tr>
+                    )}
                     </tbody>
                 </table>
                 <div className="flex justify-end items-center p-4">
@@ -374,7 +434,7 @@ export default function Maintenance() {
                                 currentPage === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-700'
                             }`}
                             onClick={() => handlePageChange(currentPage - 1)}
-                            disabled={currentPage === 0}
+                            disabled={currentPage === 0 || loading}
                         >
                             {t('previous')}
                         </button>
@@ -384,7 +444,7 @@ export default function Maintenance() {
                                 currentPage === totalPages - 1 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-700'
                             }`}
                             onClick={() => handlePageChange(currentPage + 1)}
-                            disabled={currentPage === totalPages - 1}
+                            disabled={currentPage === totalPages - 1 || loading}
                         >
                             {t('next')}
                         </button>
@@ -399,7 +459,7 @@ export default function Maintenance() {
                 newMaintenance={newMaintenanceData}
                 onInputChange={handleAddInputChange}
                 equipmentItems={equipmentItems}
-                maintenanceData={maintenanceData} // Truyền maintenanceData
+                maintenanceData={maintenanceData}
             />
             <EditMaintenance
                 isOpen={isEditModalOpen}

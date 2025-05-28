@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, Fragment, useCallback } from 'react';
 import SearchBar from '../Nav/SearchBar.jsx';
 import { Pencil, Trash2, Plus, ChevronDown, ChevronUp, Loader2, History } from 'lucide-react';
 import AddEquipment from './AddEquipment.jsx';
@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 import { useAuth } from '../../Auth/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
+import debounce from 'lodash.debounce';
 
 export default function EquipmentList() {
     const { t } = useTranslation();
@@ -46,12 +47,12 @@ export default function EquipmentList() {
     });
     const [selectedEquipmentItem, setSelectedEquipmentItem] = useState(null);
     const [equipmentItemToDelete, setEquipmentItemToDelete] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false); // Aligned with BorrowTable's initial state
     const [error, setError] = useState(null);
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
     const [pageSize] = useState(10);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchQuery, setSearchQuery] = useState(''); // Renamed to searchQuery to match BorrowTable
     const [expandedEquipmentId, setExpandedEquipmentId] = useState(null);
     const [equipmentItems, setEquipmentItems] = useState({});
     const [itemsLoading, setItemsLoading] = useState({});
@@ -61,20 +62,25 @@ export default function EquipmentList() {
 
     const BASE_URL = 'http://localhost:9090';
 
-    const fetchEquipmentData = async (page = 0, search = '', locationId = '', categoryId = '') => {
+    const fetchEquipmentData = useCallback(async (page = 0) => {
         try {
             setLoading(true);
             let url = `${BASE_URL}/equipment/get?page=${page}&size=${pageSize}`;
-            if (search) url += `&name=${encodeURIComponent(search)}`;
-            if (locationId) url += `&locationId=${locationId}`;
-            if (categoryId) url += `&categoryId=${categoryId}`;
+            if (searchQuery) url += `&name=${encodeURIComponent(searchQuery)}`;
+            if (filterLocationId) url += `&locationId=${filterLocationId}`;
+            if (filterCategoryId) url += `&categoryId=${filterCategoryId}`;
 
+            console.log('Fetching equipment data with URL:', url);
             const response = await fetchWithAuth(url, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
-            if (!response.ok) throw new Error(t('fetchError'));
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`API Error: ${response.status} - ${errorText || t('fetchError')}`);
+            }
             const data = await response.json();
+            console.log('API Response:', data);
             const equipmentList = data.content || [];
             const quantities = {};
             await Promise.all(
@@ -99,13 +105,16 @@ export default function EquipmentList() {
             );
             setEquipmentData(equipmentList);
             setEquipmentQuantities(quantities);
-            setTotalPages(data.page.totalPages || 1);
+            setTotalPages(data.page?.totalPages || 1);
         } catch (err) {
+            console.error('Fetch equipment data error:', err);
             setError(err.message);
+            setEquipmentData([]);
+            setTotalPages(1);
         } finally {
             setLoading(false);
         }
-    };
+    }, [fetchWithAuth, pageSize, searchQuery, filterLocationId, filterCategoryId, t]);
 
     const fetchEquipmentItems = async (equipmentId) => {
         if (!equipmentId || isNaN(equipmentId)) {
@@ -172,9 +181,17 @@ export default function EquipmentList() {
         }
     };
 
-    const handleSearch = (term) => {
-        setSearchTerm(term);
-        fetchEquipmentData(currentPage, term, filterLocationId, filterCategoryId);
+    const debouncedFetchEquipmentData = useCallback(
+        debounce((page) => {
+            console.log('Debounced fetch triggered for page:', page);
+            fetchEquipmentData(page);
+        }, 200),
+        [fetchEquipmentData]
+    );
+
+    const handleSearch = (query) => {
+        setSearchQuery(query);
+        setCurrentPage(0); // Reset to first page on new search
     };
 
     const handleFilterChange = (type, value) => {
@@ -188,18 +205,27 @@ export default function EquipmentList() {
             default:
                 break;
         }
-        fetchEquipmentData(0, searchTerm, type === 'location' ? value : filterLocationId, type === 'category' ? value : filterCategoryId);
+        setCurrentPage(0); // Reset to first page on filter change
     };
 
     useEffect(() => {
         setLoading(true);
-        fetchEquipmentData(currentPage, searchTerm, filterLocationId, filterCategoryId);
-    }, [currentPage, searchTerm, filterLocationId, filterCategoryId]);
+        setCurrentPage(0);
+        debouncedFetchEquipmentData(0);
+        return () => debouncedFetchEquipmentData.cancel();
+    }, [searchQuery, filterLocationId, filterCategoryId, debouncedFetchEquipmentData]);
+
+    useEffect(() => {
+        if (currentPage !== 0) {
+            debouncedFetchEquipmentData(currentPage);
+        }
+        return () => debouncedFetchEquipmentData.cancel();
+    }, [currentPage, debouncedFetchEquipmentData]);
 
     useEffect(() => {
         fetchLocations();
         fetchCategories();
-    }, []);
+    }, [fetchWithAuth]);
 
     useEffect(() => {
         setEquipmentItems({});
@@ -243,7 +269,7 @@ export default function EquipmentList() {
                 image: null,
             });
             setIsAddModalOpen(false);
-            fetchEquipmentData(currentPage, searchTerm, filterLocationId, filterCategoryId);
+            fetchEquipmentData(currentPage);
         } catch (err) {
             console.error('Failed to add equipment:', err);
             alert(err.message);
@@ -281,7 +307,7 @@ export default function EquipmentList() {
             setIsAddItemModalOpen(false);
             setSelectedEquipmentForItem(null);
             fetchEquipmentItems(newEquipmentItemData.equipmentId);
-            fetchEquipmentData(currentPage, searchTerm, filterLocationId, filterCategoryId);
+            fetchEquipmentData(currentPage);
             if (expandedEquipmentId === newEquipmentItemData.equipmentId) {
                 fetchEquipmentItems(newEquipmentItemData.equipmentId);
             }
@@ -350,7 +376,7 @@ export default function EquipmentList() {
 
             if (!response.ok) throw new Error(t('deleteItemError'));
 
-            fetchEquipmentData(currentPage, searchTerm, filterLocationId, filterCategoryId);
+            fetchEquipmentData(currentPage);
             setIsDeleteItemModalOpen(false);
             setEquipmentItemToDelete(null);
         } catch (err) {
@@ -393,7 +419,7 @@ export default function EquipmentList() {
 
             setIsEditModalOpen(false);
             setSelectedEquipment(null);
-            fetchEquipmentData(currentPage, searchTerm, filterLocationId, filterCategoryId);
+            fetchEquipmentData(currentPage);
 
             if (expandedEquipmentId === selectedEquipment.id) {
                 fetchEquipmentItems(selectedEquipment.id);
@@ -413,7 +439,7 @@ export default function EquipmentList() {
             if (!response.ok) throw new Error(t('deleteError'));
             setIsDeleteModalOpen(false);
             setEquipmentToDelete(null);
-            fetchEquipmentData(currentPage, searchTerm, filterLocationId, filterCategoryId);
+            fetchEquipmentData(currentPage);
         } catch (err) {
             console.error(err);
             alert(err.message);
@@ -589,7 +615,6 @@ export default function EquipmentList() {
         setSelectedEquipment((prev) => ({ ...prev, image: e.target.files[0] }));
     };
 
-    // Thêm hàm điều hướng khi nhấn "Xem lịch sử bảo trì"
     const handleOpenMaintenanceHistory = (item) => {
         if (!item || !item.id) {
             console.error('Invalid equipment item:', item);
@@ -599,21 +624,12 @@ export default function EquipmentList() {
         navigate(`/maintenance-history/${item.id}`, { state: { serialNumber: item.serialNumber } });
     };
 
-    if (loading && equipmentData.length === 0) {
-        return (
-            <div className="min-h-screen p-6 flex items-center justify-center">
-                <Loader2 size={24} className="animate-spin mr-2" />
-                <p>{t('loading')}</p>
-            </div>
-        );
-    }
-
     if (error) {
         return (
             <div className="min-h-screen p-6 flex items-center justify-center">
                 <p className="text-red-600">{t('error')}: {error}</p>
                 <button
-                    onClick={() => fetchEquipmentData(0, searchTerm, filterLocationId, filterCategoryId)}
+                    onClick={() => fetchEquipmentData(0)}
                     className="ml-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                 >
                     {t('retry')}
@@ -678,162 +694,171 @@ export default function EquipmentList() {
                     </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                    {equipmentData.map((equipment) => (
-                        <Fragment key={`equipment-${equipment.id}`}>
-                            <tr className="hover:bg-gray-50">
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{equipment.id}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                    <button
-                                        onClick={() => toggleDropdown(equipment.id)}
-                                        className="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 font-medium rounded-md shadow-sm hover:bg-blue-100 hover:scale-105 active:scale-95 transition-all duration-200"
-                                    >
-                                        {equipment.name}
-                                        {expandedEquipmentId === equipment.id ? (
-                                            <ChevronUp size={20} className="ml-2" />
-                                        ) : (
-                                            <ChevronDown size={20} className="ml-2" />
-                                        )}
-                                    </button>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                    {equipment.imageUrl ? (
-                                        <img
-                                            src={equipment.imageUrl}
-                                            alt={equipment.name}
-                                            className="w-16 h-16 object-cover rounded"
-                                            onError={(e) => {
-                                                console.error(`Failed to load image: ${equipment.imageUrl}`);
-                                                e.target.src = '/fallback-image.png';
-                                            }}
-                                        />
-                                    ) : t('noImage')}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
-                                    {equipmentQuantities[equipment.id] !== undefined ? equipmentQuantities[equipment.id] : '-'}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <span className="flex items-center text-center space-x-1">
-                      <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('ACTIVE')}`}>
-                        {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[0] : '0'}
-                      </span>
-                      <span className="text-gray-500">/</span>
-                      <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('BROKEN')}`}>
-                        {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[1] : '0'}
-                      </span>
-                      <span className="text-gray-500">/</span>
-                      <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('MAINTENANCE')}`}>
-                        {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[2] : '0'}
-                      </span>
-                      <span className="text-gray-500">/</span>
-                      <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('BORROWED')}`}>
-                        {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[3] : '0'}
-                      </span>
-                    </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{equipment.categoryName}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{equipment.description || '-'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="flex space-x-3">
+                    {loading && equipmentData.length === 0 ? (
+                        <tr>
+                            <td colSpan="8" className="py-4 text-center text-gray-600">
+                                <Loader2 size={24} className="animate-spin inline-block mr-2" />
+                                {t('loading')}...
+                            </td>
+                        </tr>
+                    ) : equipmentData.length > 0 ? (
+                        equipmentData.map((equipment) => (
+                            <Fragment key={`equipment-${equipment.id}`}>
+                                <tr className="hover:bg-gray-50">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{equipment.id}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm">
                                         <button
-                                            className="p-2 text-blue-700 rounded-md hover:bg-blue-100 transition duration-200"
-                                            onClick={() => handleOpenEditModal(equipment)}
+                                            onClick={() => toggleDropdown(equipment.id)}
+                                            className="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 font-medium rounded-md shadow-sm hover:bg-blue-100 hover:scale-105 active:scale-95 transition-all duration-200"
                                         >
-                                            <Pencil size={16} />
+                                            {equipment.name}
+                                            {expandedEquipmentId === equipment.id ? (
+                                                <ChevronUp size={20} className="ml-2" />
+                                            ) : (
+                                                <ChevronDown size={20} className="ml-2" />
+                                            )}
                                         </button>
-                                        <button
-                                            className="p-2 text-red-700 rounded-md hover:bg-red-100 transition duration-200"
-                                            onClick={() => handleOpenDeleteModal(equipment)}
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                        <button
-                                            className="p-2 text-green-700 rounded-md hover:bg-green-100 transition duration-200"
-                                            onClick={() => handleOpenAddItemModal(equipment)}
-                                        >
-                                            <Plus size={16} />
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            {expandedEquipmentId === equipment.id && (
-                                <tr>
-                                    <td colSpan="8" className="bg-gray-50 p-4">
-                                        {itemsLoading[equipment.id] ? (
-                                            <div className="flex justify-center items-center py-4">
-                                                <Loader2 size={24} className="animate-spin text-gray-600" />
-                                                <span className="ml-2 text-gray-600">{t('loading')}...</span>
-                                            </div>
-                                        ) : equipmentItems[equipment.id]?.length > 0 ? (
-                                            <div className="max-h-80 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                                                <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-2">
-                                                    {equipmentItems[equipment.id].map((item) => (
-                                                        <div
-                                                            key={`item-${item.id}`}
-                                                            className="p-4 bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-gray-100 transition-colors duration-200"
-                                                        >
-                                                            <div className="flex flex-col space-y-2">
-                                                                <div className="flex justify-between items-center">
-                                    <span className="text-sm font-medium text-gray-900">
-                                      {t('serialNumber')}: {item.serialNumber || '-'}
-                                    </span>
-                                                                    <div className="flex space-x-2">
-                                                                        <button
-                                                                            className="p-1 text-blue-700 rounded-md hover:bg-blue-100 transition duration-200"
-                                                                            onClick={() => handleOpenEditItemModal(item)}
-                                                                        >
-                                                                            <Pencil size={14} />
-                                                                        </button>
-                                                                        <button
-                                                                            className="p-1 text-red-700 rounded-md hover:bg-red-100 transition duration-200"
-                                                                            onClick={() => handleOpenDeleteItemModal(item)}
-                                                                        >
-                                                                            <Trash2 size={14} />
-                                                                        </button>
-                                                                        <button
-                                                                            className="p-1 text-purple-700 rounded-md hover:bg-purple-100 transition duration-200"
-                                                                            onClick={() => handleOpenMaintenanceHistory(item)}
-                                                                        >
-                                                                            <History size={14} />
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                                <span
-                                                                    className={`inline-block px-2 py-1 text-xs font-medium rounded-full border w-fit ${getStatusColor(item.status)}`}
-                                                                >
-                                    {getTranslatedStatus(item.status) || '-'}
-                                  </span>
-                                                                <div className="text-sm text-gray-600">
-                                                                    <span className="font-medium">{t('purchaseDate')}:</span> {formatDate(item.purchaseDate) || '-'}
-                                                                </div>
-                                                                <div className="text-sm text-gray-600">
-                                                                    <span className="font-medium">{t('location')}:</span> {item.locationName || '-'}
-                                                                </div>
-                                                                {item.returnDate && (
-                                                                    <div className="text-sm text-gray-600">
-                                                                        <span className="font-medium">{t('returnDate')}:</span> {formatDate(item.returnDate)}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <p className="text-gray-600 text-center py-4">{t('noItems')}</p>
-                                        )}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                        {equipment.imageUrl ? (
+                                            <img
+                                                src={equipment.imageUrl}
+                                                alt={equipment.name}
+                                                className="w-16 h-16 object-cover rounded"
+                                                onError={(e) => {
+                                                    console.error(`Failed to load image: ${equipment.imageUrl}`);
+                                                    e.target.src = '/fallback-image.png';
+                                                }}
+                                            />
+                                        ) : t('noImage')}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+                                        {equipmentQuantities[equipment.id] !== undefined ? equipmentQuantities[equipment.id] : '-'}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <span className="flex items-center text-center space-x-1">
+                                            <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('ACTIVE')}`}>
+                                                {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[0] : '0'}
+                                            </span>
+                                            <span className="text-gray-500">/</span>
+                                            <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('BROKEN')}`}>
+                                                {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[1] : '0'}
+                                            </span>
+                                            <span className="text-gray-500">/</span>
+                                            <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('MAINTENANCE')}`}>
+                                                {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[2] : '0'}
+                                            </span>
+                                            <span className="text-gray-500">/</span>
+                                            <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('BORROWED')}`}>
+                                                {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[3] : '0'}
+                                            </span>
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{equipment.categoryName}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{equipment.description || '-'}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="flex space-x-3">
+                                            <button
+                                                className="p-2 text-blue-700 rounded-md hover:bg-blue-100 transition duration-200"
+                                                onClick={() => handleOpenEditModal(equipment)}
+                                            >
+                                                <Pencil size={16} />
+                                            </button>
+                                            <button
+                                                className="p-2 text-red-700 rounded-md hover:bg-red-100 transition duration-200"
+                                                onClick={() => handleOpenDeleteModal(equipment)}
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                            <button
+                                                className="p-2 text-green-700 rounded-md hover:bg-green-100 transition duration-200"
+                                                onClick={() => handleOpenAddItemModal(equipment)}
+                                            >
+                                                <Plus size={16} />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
-                            )}
-                        </Fragment>
-                    ))}
+                                {expandedEquipmentId === equipment.id && (
+                                    <tr>
+                                        <td colSpan="8" className="bg-gray-50 p-4">
+                                            {itemsLoading[equipment.id] ? (
+                                                <div className="flex justify-center items-center py-4">
+                                                    <Loader2 size={24} className="animate-spin text-gray-600" />
+                                                    <span className="ml-2 text-gray-600">{t('loading')}...</span>
+                                                </div>
+                                            ) : equipmentItems[equipment.id]?.length > 0 ? (
+                                                <div className="max-h-80 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                                                    <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-2">
+                                                        {equipmentItems[equipment.id].map((item) => (
+                                                            <div
+                                                                key={`item-${item.id}`}
+                                                                className="p-4 bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-gray-100 transition-colors duration-200"
+                                                            >
+                                                                <div className="flex flex-col space-y-2">
+                                                                    <div className="flex justify-between items-center">
+                                                                        <span className="text-sm font-medium text-gray-900">
+                                                                            {t('serialNumber')}: {item.serialNumber || '-'}
+                                                                        </span>
+                                                                        <div className="flex space-x-2">
+                                                                            <button
+                                                                                className="p-1 text-blue-700 rounded-md hover:bg-blue-100 transition duration-200"
+                                                                                onClick={() => handleOpenEditItemModal(item)}
+                                                                            >
+                                                                                <Pencil size={14} />
+                                                                            </button>
+                                                                            <button
+                                                                                className="p-1 text-red-700 rounded-md hover:bg-red-100 transition duration-200"
+                                                                                onClick={() => handleOpenDeleteItemModal(item)}
+                                                                            >
+                                                                                <Trash2 size={14} />
+                                                                            </button>
+                                                                            <button
+                                                                                className="p-1 text-purple-700 rounded-md hover:bg-purple-100 transition duration-200"
+                                                                                onClick={() => handleOpenMaintenanceHistory(item)}
+                                                                            >
+                                                                                <History size={14} />
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                    <span
+                                                                        className={`inline-block px-2 py-1 text-xs font-medium rounded-full border w-fit ${getStatusColor(item.status)}`}
+                                                                    >
+                                                                        {getTranslatedStatus(item.status) || '-'}
+                                                                    </span>
+                                                                    <div className="text-sm text-gray-600">
+                                                                        <span className="font-medium">{t('purchaseDate')}:</span> {formatDate(item.purchaseDate) || '-'}
+                                                                    </div>
+                                                                    <div className="text-sm text-gray-600">
+                                                                        <span className="font-medium">{t('location')}:</span> {item.locationName || '-'}
+                                                                    </div>
+                                                                    {item.returnDate && (
+                                                                        <div className="text-sm text-gray-600">
+                                                                            <span className="font-medium">{t('returnDate')}:</span> {formatDate(item.returnDate)}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <p className="text-gray-600 text-center py-4">{t('noItems')}</p>
+                                            )}
+                                        </td>
+                                    </tr>
+                                )}
+                            </Fragment>
+                        ))
+                    ) : (
+                        <tr>
+                            <td colSpan="8" className="py-4 text-center text-gray-600">
+                                {t('noEquipmentFound')}
+                            </td>
+                        </tr>
+                    )}
                     </tbody>
                 </table>
-                {loading && equipmentData.length > 0 && (
-                    <div className="flex justify-center py-4">
-                        <Loader2 size={24} className="animate-spin text-gray-600" />
-                        <span className="ml-2 text-gray-600">{t('loading')}...</span>
-                    </div>
-                )}
                 <div className="flex justify-end items-center p-4">
                     <div className="flex gap-2">
                         <button
@@ -841,7 +866,7 @@ export default function EquipmentList() {
                                 currentPage === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-700'
                             }`}
                             onClick={() => handlePageChange(currentPage - 1)}
-                            disabled={currentPage === 0}
+                            disabled={currentPage === 0 || loading}
                         >
                             {t('previous')}
                         </button>
@@ -851,7 +876,7 @@ export default function EquipmentList() {
                                 currentPage === totalPages - 1 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-700'
                             }`}
                             onClick={() => handlePageChange(currentPage + 1)}
-                            disabled={currentPage === totalPages - 1}
+                            disabled={currentPage === totalPages - 1 || loading}
                         >
                             {t('next')}
                         </button>

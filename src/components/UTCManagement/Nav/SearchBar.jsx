@@ -1,19 +1,30 @@
 import { useTranslation } from 'react-i18next';
-import {useEffect, useState} from "react";
+import { useState, useEffect, useCallback } from 'react';
+import debounce from 'lodash.debounce';
 
 export default function SearchBar({ onSearch }) {
     const { t } = useTranslation();
     const [searchTerm, setSearchTerm] = useState('');
 
-    useEffect(() => {
-        console.log("rerender")
-    }, [])
+    const debouncedSearch = useCallback(
+        debounce((value) => {
+            onSearch(value);
+        }, 300),
+        [onSearch]
+    );
+
     const handleSearch = (e) => {
-        setSearchTerm(e.target.value);
-        onSearch(e.target.value); // Gửi giá trị tìm kiếm lên parent component
-        console.log(e.target.value);
+        const value = e.target.value;
+        setSearchTerm(value);
+        debouncedSearch(value);
+        console.log(value);
     };
 
+    useEffect(() => {
+        return () => {
+            debouncedSearch.cancel();
+        };
+    }, [debouncedSearch]);
 
     return (
         <div className="relative w-64">

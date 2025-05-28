@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Loader2 } from 'lucide-react';
-import debounce from 'lodash.debounce';
 import SearchBar from '../Nav/SearchBar.jsx';
+import debounce from 'lodash.debounce';
 
 export default function BrokenReports() {
     const { t } = useTranslation();
@@ -12,7 +12,7 @@ export default function BrokenReports() {
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
     const [pageSize] = useState(10);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchQuery, setSearchQuery] = useState(''); // Renamed to searchQuery to match BorrowTable
 
     const BASE_URL = 'http://localhost:9090';
 
@@ -43,7 +43,7 @@ export default function BrokenReports() {
         }
     };
 
-    const fetchBrokenReports = useCallback(async (page = 0, search = '') => {
+    const fetchBrokenReports = useCallback(async (page = 0) => {
         try {
             setLoading(true);
             let accessToken = localStorage.getItem('accessToken');
@@ -52,10 +52,14 @@ export default function BrokenReports() {
                 return;
             }
 
-            const url = search
-                ? `${BASE_URL}/broken/get/reports?equipmentName=${encodeURIComponent(search)}&page=${page}&size=${pageSize}`
-                : `${BASE_URL}/broken/get/reports?page=${page}&size=${pageSize}`;
+            let url;
+            if (searchQuery && searchQuery.trim() !== '') {
+                url = `${BASE_URL}/broken/search?equipmentName=${encodeURIComponent(searchQuery)}&page=${page}&size=${pageSize}`;
+            } else {
+                url = `${BASE_URL}/broken/get/reports?page=${page}&size=${pageSize}`;
+            }
 
+            console.log('Fetching broken reports with URL:', url);
             const response = await fetch(url, {
                 method: 'GET',
                 headers: {
@@ -92,16 +96,46 @@ export default function BrokenReports() {
                 }
             } else {
                 const data = await response.json();
+                console.log('API Response:', data);
                 setReports(data.content || []);
                 setTotalPages(data.totalPages || 1);
             }
         } catch (err) {
             console.error('Fetch broken reports error:', err);
             setError(err.message);
+            setReports([]);
+            setTotalPages(1);
         } finally {
             setLoading(false);
         }
-    }, [t, pageSize]);
+    }, [searchQuery, pageSize, t]);
+
+    const debouncedFetchBrokenReports = useCallback(
+        debounce((page) => {
+            console.log('Debounced fetch triggered for page:', page);
+            fetchBrokenReports(page);
+        }, 200),
+        [fetchBrokenReports]
+    );
+
+    const handleSearch = (query) => {
+        setSearchQuery(query);
+        setCurrentPage(0); // Reset to first page on new search
+    };
+
+    useEffect(() => {
+        setLoading(true);
+        setCurrentPage(0);
+        debouncedFetchBrokenReports(0);
+        return () => debouncedFetchBrokenReports.cancel();
+    }, [searchQuery, debouncedFetchBrokenReports]);
+
+    useEffect(() => {
+        if (currentPage !== 0) {
+            debouncedFetchBrokenReports(currentPage);
+        }
+        return () => debouncedFetchBrokenReports.cancel();
+    }, [currentPage, debouncedFetchBrokenReports]);
 
     const handleUpdateStatus = async (id, status) => {
         try {
@@ -151,18 +185,6 @@ export default function BrokenReports() {
             alert(err.message);
         }
     };
-
-    const debouncedFetchBrokenReports = useCallback(
-        debounce((page, search) => {
-            fetchBrokenReports(page, search);
-        }, 200),
-        [fetchBrokenReports]
-    );
-
-    useEffect(() => {
-        debouncedFetchBrokenReports(currentPage, searchTerm);
-        return () => debouncedFetchBrokenReports.cancel();
-    }, [currentPage, searchTerm, debouncedFetchBrokenReports]);
 
     const handlePageChange = (page) => {
         if (page >= 0 && page < totalPages && page !== currentPage) {
@@ -217,54 +239,25 @@ export default function BrokenReports() {
         }
     };
 
-    // Hàm xác định màu sắc cho từng tùy chọn trong dropdown
     const getStatusColorClass = (status) => {
         switch (status) {
             case 'PENDING':
-                return 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'; // Màu vàng
+                return 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200';
             case 'IN_PROGRESS':
-                return 'bg-blue-100 text-blue-700 hover:bg-blue-200'; // Màu xanh dương
+                return 'bg-blue-100 text-blue-700 hover:bg-blue-200';
             case 'RESOLVED':
-                return 'bg-green-100 text-green-700 hover:bg-green-200'; // Màu xanh lá
+                return 'bg-green-100 text-green-700 hover:bg-green-200';
             default:
-                return 'bg-gray-100 text-gray-700 hover:bg-gray-200'; // Màu xám mặc định
+                return 'bg-gray-100 text-gray-700 hover:bg-gray-200';
         }
     };
-
-    // Hàm lấy trạng thái đã dịch
-    const getTranslatedStatus = (status) => {
-        switch (status) {
-            case 'PENDING':
-                return t('statusPending');
-            case 'IN_PROGRESS':
-                return t('statusInProgress');
-            case 'RESOLVED':
-                return t('statusResolved');
-            default:
-                return status;
-        }
-    };
-
-    const handleSearch = (term) => {
-        setSearchTerm(term);
-        setCurrentPage(0);
-    };
-
-    if (loading) {
-        return (
-            <div className="min-h-screen p-6 flex items-center justify-center">
-                <Loader2 size={24} className="animate-spin text-gray-600" />
-                <span className="ml-2 text-gray-600">{t('loading')}...</span>
-            </div>
-        );
-    }
 
     if (error) {
         return (
             <div className="min-h-screen p-6 flex items-center justify-center">
                 <p className="text-red-600">{t('error')}: {error}</p>
                 <button
-                    onClick={() => fetchBrokenReports(0, '')}
+                    onClick={() => fetchBrokenReports(0)}
                     className="ml-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                 >
                     {t('retry')}
@@ -295,7 +288,14 @@ export default function BrokenReports() {
                     </tr>
                     </thead>
                     <tbody>
-                    {reports.length > 0 ? (
+                    {loading ? (
+                        <tr>
+                            <td colSpan="7" className="py-4 text-center text-gray-600">
+                                <Loader2 size={24} className="animate-spin inline-block mr-2" />
+                                {t('loading')}...
+                            </td>
+                        </tr>
+                    ) : reports.length > 0 ? (
                         reports.map((report) => (
                             <tr key={report.id} className="border-t border-gray-200 hover:bg-gray-50">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm">{report.id}</td>

@@ -16,7 +16,7 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
     const [selectedEquipmentItemId, setSelectedEquipmentItemId] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [brokenDetails, setBrokenDetails] = useState({
-        brokenDate: new Date().toISOString().slice(0, 16), // Mặc định là thời gian hiện tại
+        brokenDate: new Date().toISOString().slice(0, 16),
         description: '',
     });
     const [submitting, setSubmitting] = useState(false);
@@ -29,7 +29,6 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
 
     const BASE_URL = 'http://localhost:9090';
 
-    // Hàm làm mới token
     const refreshToken = async () => {
         const refreshToken = localStorage.getItem('refreshToken');
         if (!refreshToken) {
@@ -711,9 +710,9 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                 <div className="fixed inset-0 bg-opacity-50 flex items-center justify-center z-50 bg-black/30">
                     <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md pointer-events-auto">
                         <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('reportBrokenEquipment')}</h2>
-                        <p className="text-gray-600 mb-4">
-                            {t('reportingEquipment', { name: selectedEquipment?.name })}
-                        </p>
+                        {/*<p className="text-gray-600 mb-4">*/}
+                        {/*    {t('reportingEquipment', { name: selectedEquipment?.name })}*/}
+                        {/*</p>*/}
                         <div className="mb-4">
                             <label className="block text-sm font-medium text-gray-700">{t('equipmentItem')}</label>
                             {itemsLoading[selectedEquipment?.id] ? (
@@ -759,7 +758,7 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                                 onChange={(e) => setBrokenDetails({ ...brokenDetails, description: e.target.value })}
                                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                 rows="4"
-                                placeholder={t('brokenDescriptionPlaceholder')}
+                                placeholder={t('')}
                                 required
                             />
                         </div>

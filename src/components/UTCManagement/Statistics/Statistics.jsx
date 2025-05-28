@@ -105,7 +105,7 @@ export default function ReportsDashboard() {
 
             const response = await fetchWithAuth(`${endpoint}?${params.toString()}`, {
                 method: 'GET',
-                responseType: 'blob', // Quan trọng để xử lý file binary
+                responseType: 'blob',
             });
 
             if (!response.ok) {
@@ -248,6 +248,34 @@ export default function ReportsDashboard() {
         }
     };
 
+    // Hàm xác định màu sắc trạng thái
+    const getStatusColor = (status) => {
+        switch (status?.toUpperCase()) { // Dùng toUpperCase để khớp với PENDING, IN_PROGRESS, RESOLVED
+            case 'PENDING':
+                return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+            case 'IN_PROGRESS':
+                return 'bg-blue-100 text-blue-700 border-blue-200';
+            case 'RESOLVED':
+                return 'bg-green-100 text-green-700 border-green-200';
+            default:
+                return 'bg-gray-100 text-gray-700 border-gray-200';
+        }
+    };
+
+    // Hàm dịch trạng thái
+    const getTranslatedStatus = (status) => {
+        switch (status?.toUpperCase()) { // Dùng toUpperCase để khớp với PENDING, IN_PROGRESS, RESOLVED
+            case 'PENDING':
+                return t('statusPending');
+            case 'IN_PROGRESS':
+                return t('statusInProgress');
+            case 'RESOLVED':
+                return t('statusResolved');
+            default:
+                return status || '-';
+        }
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen p-6 flex items-center justify-center">
@@ -275,7 +303,7 @@ export default function ReportsDashboard() {
     }
 
     return (
-        <div className="min-h-screen p-6 min-w-full overflow-auto ">
+        <div className="min-h-screen p-6 min-w-full overflow-auto">
             <div className="mb-6">
                 <h1 className="text-3xl font-bold text-gray-900">{t('statistics')}</h1>
             </div>
@@ -483,7 +511,11 @@ export default function ReportsDashboard() {
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">{report.fullName}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">{formatDateTime(report.brokenDate)}</td>
                                     <td className="px-6 py-4 text-sm">{report.description}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm">{report.status}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                        <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(report.status)}`}>
+                                            {getTranslatedStatus(report.status)}
+                                        </span>
+                                    </td>
                                 </tr>
                             ))
                         ) : (

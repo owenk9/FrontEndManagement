@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../Auth/AuthContext.jsx';
-import { Bar, Pie, Line, Doughnut } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, PointElement, LineElement, ArcElement } from 'chart.js';
+import { Bar, Pie } from 'react-chartjs-2'; // Xóa Line vì không còn dùng
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
 
 // Đăng ký các thành phần cần thiết cho Chart.js
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, PointElement, LineElement, ArcElement);
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
 
 export default function Statistics() {
     const { t } = useTranslation();
@@ -26,59 +26,52 @@ export default function Statistics() {
         try {
             setLoading(true);
 
-            // Fetch tổng số Equipment
-            const totalEquipmentResponse = await fetchWithAuth(`${BASE_URL}/statistics/total_equipment`, {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
-            });
-            if (!totalEquipmentResponse.ok) throw new Error(t('fetchError'));
-            const totalEquipment = await totalEquipmentResponse.json();
-
-            // Fetch tổng số EquipmentItems
-            const totalEquipmentItemsResponse = await fetchWithAuth(`${BASE_URL}/statistics/total_equipment_item`, {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
-            });
-            if (!totalEquipmentItemsResponse.ok) throw new Error(t('fetchError'));
-            const totalEquipmentItems = await totalEquipmentItemsResponse.json();
-
-            // Fetch phân bố trạng thái
-            const statusDistributionResponse = await fetchWithAuth(`${BASE_URL}/statistics/status_distribution`, {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
-            });
-            if (!statusDistributionResponse.ok) throw new Error(t('fetchError'));
-            const statusDistribution = await statusDistributionResponse.json();
-
-            // Fetch tổng chi phí bảo trì
-            const totalMaintenanceCostResponse = await fetchWithAuth(`${BASE_URL}/statistics/total_maintenance_cost`, {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
-            });
-            if (!totalMaintenanceCostResponse.ok) throw new Error(t('fetchError'));
-            const totalMaintenanceCost = await totalMaintenanceCostResponse.json();
-
-            // Fetch số lượng bảo trì theo thời gian (giới hạn trong năm 2025)
-            const maintenanceByTimeResponse = await fetchWithAuth(
-                `${BASE_URL}/statistics/maintenance_by_time?startDate=2025-01-01 00:00:00&endDate=2025-12-31 23:59:59&groupBy=month`,
-                {
+            const [
+                totalEquipmentResponse,
+                totalEquipmentItemsResponse,
+                statusDistributionResponse,
+                totalMaintenanceCostResponse,
+                maintenanceByTimeResponse,
+                brokenByTimeResponse,
+            ] = await Promise.all([
+                fetchWithAuth(`${BASE_URL}/statistics/total_equipment`, { method: 'GET', headers: { 'Content-Type': 'application/json' } }),
+                fetchWithAuth(`${BASE_URL}/statistics/total_equipment_item`, { method: 'GET', headers: { 'Content-Type': 'application/json' } }),
+                fetchWithAuth(`${BASE_URL}/statistics/status_distribution`, { method: 'GET', headers: { 'Content-Type': 'application/json' } }),
+                fetchWithAuth(`${BASE_URL}/statistics/total_maintenance_cost`, { method: 'GET', headers: { 'Content-Type': 'application/json' } }),
+                fetchWithAuth(`${BASE_URL}/statistics/maintenance_by_time?startDate=2025-01-01 00:00:00&endDate=2025-12-31 23:59:59&groupBy=month`, {
                     method: 'GET',
                     headers: { 'Content-Type': 'application/json' },
-                }
-            );
-            if (!maintenanceByTimeResponse.ok) throw new Error(t('fetchError'));
-            const maintenanceByTime = await maintenanceByTimeResponse.json();
-
-            // Fetch số lượng thiết bị hỏng theo thời gian (giới hạn trong năm 2025)
-            const brokenByTimeResponse = await fetchWithAuth(
-                `${BASE_URL}/statistics/broken_by_time?startDate=2025-01-01 00:00:00&endDate=2025-12-31 23:59:59&groupBy=month`,
-                {
+                }),
+                fetchWithAuth(`${BASE_URL}/statistics/broken_by_time?startDate=2025-01-01 00:00:00&endDate=2025-12-31 23:59:59&groupBy=month`, {
                     method: 'GET',
                     headers: { 'Content-Type': 'application/json' },
-                }
-            );
-            if (!brokenByTimeResponse.ok) throw new Error(t('fetchError'));
-            const brokenByTime = await brokenByTimeResponse.json();
+                }),
+            ]);
+
+            if (!totalEquipmentResponse.ok) throw new Error(t('fetchError') + ': Total Equipment');
+            if (!totalEquipmentItemsResponse.ok) throw new Error(t('fetchError') + ': Total Equipment Items');
+            if (!statusDistributionResponse.ok) throw new Error(t('fetchError') + ': Status Distribution');
+            if (!totalMaintenanceCostResponse.ok) throw new Error(t('fetchError') + ': Total Maintenance Cost');
+            if (!maintenanceByTimeResponse.ok) throw new Error(t('fetchError') + ': Maintenance By Time');
+            if (!brokenByTimeResponse.ok) throw new Error(t('fetchError') + ': Broken By Time');
+
+            const [
+                totalEquipment,
+                totalEquipmentItems,
+                statusDistribution,
+                totalMaintenanceCost,
+                maintenanceByTime,
+                brokenByTime,
+            ] = await Promise.all([
+                totalEquipmentResponse.json(),
+                totalEquipmentItemsResponse.json(),
+                statusDistributionResponse.json(),
+                totalMaintenanceCostResponse.json(),
+                maintenanceByTimeResponse.json(),
+                brokenByTimeResponse.json(),
+            ]);
+
+            console.log('Maintenance By Time Data:', maintenanceByTime); // Kiểm tra dữ liệu
 
             setStats({
                 totalEquipment,
@@ -99,66 +92,64 @@ export default function Statistics() {
         fetchStatistics();
     }, []);
 
-    // Dữ liệu cho biểu đồ phân bố trạng thái (đổi từ Bar sang Doughnut)
+    // Dữ liệu cho biểu đồ phân bố trạng thái (Pie)
     const statusChartData = {
         labels: stats.statusDistribution.map((item) => item.status),
         datasets: [
             {
                 label: t('statusDistribution'),
                 data: stats.statusDistribution.map((item) => item.count),
-                backgroundColor: ['#34D399', '#EF4444', '#FBBF24', '#3B82F6'],
-                borderColor: ['#ffffff', '#ffffff', '#ffffff', '#ffffff'],
+                backgroundColor: ['#34D399', '#EF4444', '#FBBF24', '#3B82F6', '#A855F7'],
+                borderColor: '#ffffff',
                 borderWidth: 2,
-                hoverOffset: 10
+                hoverOffset: 10,
             },
         ],
     };
 
-    // Dữ liệu cho biểu đồ số lượng bảo trì theo thời gian (đổi từ Bar sang Line)
+    // Dữ liệu cho biểu đồ số lượng bảo trì theo thời gian (Bar thay vì Line)
     const maintenanceByTimeChartData = {
-        labels: stats.maintenanceByTime.map((item) => item.timePeriod),
+        labels: stats.maintenanceByTime.map((item) => item.period),
         datasets: [
             {
                 label: t('maintenanceByTime'),
-                data: stats.maintenanceByTime.map((item) => item.maintenanceCount || item.count),
-                backgroundColor: 'rgba(251, 191, 36, 0.2)',
+                data: stats.maintenanceByTime.map((item) => item.maintenanceCount),
+                backgroundColor: 'rgba(251, 191, 36, 0.7)', // Màu vàng đậm hơn
                 borderColor: '#FBBF24',
-                borderWidth: 2,
-                tension: 0.4,
-                pointBackgroundColor: '#FBBF24',
-                pointBorderColor: '#fff',
-                pointBorderWidth: 2,
-                pointRadius: 4,
-                fill: true
+                borderWidth: 1,
+                barPercentage: 0.8,
+                hoverBackgroundColor: 'rgba(251, 191, 36, 1)', // Hiệu ứng hover
             },
         ],
     };
 
-    // Dữ liệu cho biểu đồ chi phí bảo trì theo thời gian (giữ nguyên Bar)
+    // Dữ liệu cho biểu đồ chi phí bảo trì theo thời gian (Bar)
     const maintenanceCostByTimeChartData = {
-        labels: stats.maintenanceByTime.map((item) => item.timePeriod),
+        labels: stats.maintenanceByTime.map((item) => item.period),
         datasets: [
             {
                 label: t('maintenanceCostByTime'),
-                data: stats.maintenanceByTime.map((item) => item.totalCost || 0),
-                backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                data: stats.maintenanceByTime.map((item) => item.totalCost),
+                backgroundColor: 'rgba(59, 130, 246, 0.7)',
                 borderColor: '#3B82F6',
                 borderWidth: 1,
+                barPercentage: 0.8,
+                hoverBackgroundColor: 'rgba(59, 130, 246, 1)',
             },
         ],
     };
 
-    // Dữ liệu cho biểu đồ số lượng thiết bị hỏng theo thời gian (giữ nguyên Bar)
+    // Dữ liệu cho biểu đồ số lượng thiết bị hỏng theo thời gian (Bar)
     const brokenByTimeChartData = {
         labels: stats.brokenByTime.map((item) => item.timePeriod),
         datasets: [
             {
                 label: t('brokenByTime'),
                 data: stats.brokenByTime.map((item) => item.count),
-                backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                backgroundColor: 'rgba(239, 68, 68, 0.7)',
                 borderColor: '#EF4444',
                 borderWidth: 1,
-                barPercentage: 0.7,
+                barPercentage: 0.8,
                 hoverBackgroundColor: 'rgba(239, 68, 68, 1)',
             },
         ],
@@ -229,155 +220,139 @@ export default function Statistics() {
                 </div>
             </div>
 
-            {/* Biểu đồ phân bố trạng thái - Chuyển từ Bar sang Doughnut */}
+            {/* Biểu đồ phân bố trạng thái - Pie */}
             <div className="bg-white shadow-lg rounded-lg p-6 mb-8">
                 <h2 className="text-lg font-semibold text-gray-700 mb-4">{t('statusDistribution')}</h2>
-                <div className="h-64 flex justify-center">
-                    <div style={{ maxWidth: '400px' }}>
-                        <Doughnut
-                            data={statusChartData}
-                            options={{
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    legend: {
-                                        position: 'right',
-                                        labels: {
-                                            boxWidth: 15,
-                                            padding: 15
-                                        }
+                <div className="h-80 flex justify-center">
+                    <Pie
+                        data={statusChartData}
+                        options={{
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'top',
+                                    labels: {
+                                        boxWidth: 12,
+                                        padding: 20,
+                                        font: { size: 14 },
                                     },
-                                    tooltip: {
-                                        callbacks: {
-                                            label: (context) => `${context.label}: ${context.raw} (${((context.raw / context.dataset.data.reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%)`,
-                                        }
-                                    }
                                 },
-                                cutout: '60%'
-                            }}
-                        />
-                    </div>
+                                tooltip: {
+                                    callbacks: {
+                                        label: (context) =>
+                                            `${context.label}: ${context.raw} (${((context.raw / context.dataset.data.reduce((a, b) => a + b, 0)) * 100).toFixed(1)}%)`,
+                                    },
+                                },
+                            },
+                        }}
+                    />
                 </div>
             </div>
 
-            {/* Biểu đồ số lượng bảo trì theo thời gian - Chuyển từ Bar sang Line */}
+            {/* Biểu đồ số lượng bảo trì theo thời gian - Bar (đã thay đổi từ Line) */}
             <div className="bg-white shadow-lg rounded-lg p-6 mb-8">
                 <h2 className="text-lg font-semibold text-gray-700 mb-4">{t('maintenanceByTime')}</h2>
-                <div className="h-64">
-                    <Line
-                        data={maintenanceByTimeChartData}
-                        options={{
-                            maintainAspectRatio: false,
-                            scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    title: {
-                                        display: true,
-                                        text: t('numberOfMaintenance'),
+                <div className="h-80">
+                    {stats.maintenanceByTime.length > 0 ? (
+                        <Bar
+                            data={maintenanceByTimeChartData}
+                            options={{
+                                maintainAspectRatio: false,
+                                responsive: true,
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        title: { display: true, text: t('numberOfMaintenance') },
+                                        ticks: { stepSize: 1 },
                                     },
-                                    ticks: {
-                                        callback: (value) => value,
-                                        max: Math.max(...stats.maintenanceByTime.map((item) => item.maintenanceCount || item.count)) * 1.2 || 10,
-                                    },
-                                },
-                                x: {
-                                    title: {
-                                        display: true,
-                                        text: t('timePeriod'),
+                                    x: {
+                                        title: { display: true, text: t('timePeriod') },
                                     },
                                 },
-                            },
-                            plugins: {
-                                legend: {
-                                    display: false,
-                                },
-                                tooltip: {
-                                    callbacks: {
-                                        label: (context) => `${context.dataset.label}: ${context.raw}`,
+                                plugins: {
+                                    legend: { display: true, position: 'top' },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: (context) => `${context.dataset.label}: ${context.raw}`,
+                                        },
                                     },
                                 },
-                            },
-                        }}
-                    />
+                            }}
+                        />
+                    ) : (
+                        <p className="text-center text-gray-600">{t('noDataAvailable')}</p>
+                    )}
                 </div>
             </div>
 
-            {/* Biểu đồ chi phí bảo trì theo thời gian - Giữ nguyên Bar */}
+            {/* Biểu đồ chi phí bảo trì theo thời gian - Bar */}
             <div className="bg-white shadow-lg rounded-lg p-6 mb-8">
                 <h2 className="text-lg font-semibold text-gray-700 mb-4">{t('maintenanceCostByTime')}</h2>
-                <div className="h-64">
-                    <Bar
-                        data={maintenanceCostByTimeChartData}
-                        options={{
-                            maintainAspectRatio: false,
-                            scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    title: {
-                                        display: true,
-                                        text: t('maintenanceCost'),
+                <div className="h-80">
+                    {stats.maintenanceByTime.length > 0 ? (
+                        <Bar
+                            data={maintenanceCostByTimeChartData}
+                            options={{
+                                maintainAspectRatio: false,
+                                responsive: true,
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        title: { display: true, text: t('maintenanceCost') },
+                                        ticks: { callback: (value) => `${(value / 1000000).toFixed(1)}M VND` },
                                     },
-                                    ticks: {
-                                        callback: (value) => `${(value / 1000000).toFixed(1)}M`,
-                                        max: Math.max(...stats.maintenanceByTime.map((item) => item.totalCost || 0)) * 1.2 || 12000000,
-                                    },
-                                },
-                                x: {
-                                    title: {
-                                        display: true,
-                                        text: t('timePeriod'),
+                                    x: {
+                                        title: { display: true, text: t('timePeriod') },
                                     },
                                 },
-                            },
-                            plugins: {
-                                legend: {
-                                    display: false,
-                                },
-                                tooltip: {
-                                    callbacks: {
-                                        label: (context) => `${context.dataset.label}: ${context.raw.toLocaleString()} VND`,
+                                plugins: {
+                                    legend: { display: true, position: 'top' },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: (context) => `${context.dataset.label}: ${context.raw.toLocaleString()} VND`,
+                                        },
                                     },
                                 },
-                            },
-                        }}
-                    />
+                            }}
+                        />
+                    ) : (
+                        <p className="text-center text-gray-600">{t('noDataAvailable')}</p>
+                    )}
                 </div>
             </div>
 
-            {/* Biểu đồ số lượng thiết bị hỏng theo thời gian - Giữ nguyên Bar */}
+            {/* Biểu đồ số lượng thiết bị hỏng theo thời gian - Bar */}
             <div className="bg-white shadow-lg rounded-lg p-6">
                 <h2 className="text-lg font-semibold text-gray-700 mb-4">{t('brokenByTime')}</h2>
-                <div className="h-64">
-                    <Bar
-                        data={brokenByTimeChartData}
-                        options={{
-                            maintainAspectRatio: false,
-                            scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    title: {
-                                        display: true,
-                                        text: t('numberOfBroken'),
+                <div className="h-80">
+                    {stats.brokenByTime.length > 0 ? (
+                        <Bar
+                            data={brokenByTimeChartData}
+                            options={{
+                                maintainAspectRatio: false,
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        title: { display: true, text: t('numberOfBroken') },
+                                        ticks: { stepSize: 1 },
+                                    },
+                                    x: {
+                                        title: { display: true, text: t('timePeriod') },
                                     },
                                 },
-                                x: {
-                                    title: {
-                                        display: true,
-                                        text: t('timePeriod'),
+                                plugins: {
+                                    legend: { display: true, position: 'top' },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: (context) => `${t('brokenByTime')}: ${context.raw} thiết bị`,
+                                        },
                                     },
                                 },
-                            },
-                            plugins: {
-                                legend: {
-                                    display: false,
-                                },
-                                tooltip: {
-                                    callbacks: {
-                                        label: (context) => `${t('brokenByTime')}: ${context.raw} thiết bị`,
-                                    },
-                                },
-                            },
-                        }}
-                    />
+                            }}
+                        />
+                    ) : (
+                        <p className="text-center text-gray-600">{t('noDataAvailable')}</p>
+                    )}
                 </div>
             </div>
         </div>

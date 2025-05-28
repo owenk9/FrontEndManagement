@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import SearchBar from '../Nav/SearchBar.jsx';
 import { Pencil, Trash2, Plus } from 'lucide-react';
 import AddUser from './AddUser.jsx';
@@ -30,41 +30,73 @@ export default function User() {
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
     const [pageSize] = useState(10);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
 
+    const debounceRef = useRef();
     const BASE_URL = 'http://localhost:9090';
 
-    const fetchUserData = async (page = 0, search = '') => {
+    const fetchUserData = useCallback(async (page = 0, query = '') => {
         try {
             setLoading(true);
-            let url = `${BASE_URL}/user/get?page=${page}&size=${pageSize}`;
-            if (search) url += `&name=${encodeURIComponent(search)}`;
+            let url;
+            if (query && query.trim() !== '') {
+                url = `${BASE_URL}/user/search?page=${page}&size=${pageSize}&name=${encodeURIComponent(query)}`;
+            } else {
+                url = `${BASE_URL}/user/get?page=${page}&size=${pageSize}`;
+            }
+
             const response = await fetchWithAuth(url, {
                 method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-                },
+                headers: { 'Content-Type': 'application/json' },
             });
-            if (!response.ok) throw new Error(t('fetchError'));
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`${t('fetchError')}: ${errorText}`);
+            }
+
             const data = await response.json();
             setUserData(data.content || []);
-            setTotalPages(data.page.totalPages || 1);
+            setTotalPages(data.totalPages || 1);
         } catch (err) {
+            console.error('Fetch user error:', err);
             setError(err.message);
+            setUserData([]);
+            setTotalPages(1);
         } finally {
             setLoading(false);
         }
-    };
+    }, [fetchWithAuth, pageSize, t]);
 
-    const handleSearch = (term) => {
-        setSearchTerm(term);
-    };
+    const debouncedFetchUserData = useCallback((page, query) => {
+        if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
+        }
+        debounceRef.current = setTimeout(() => {
+            fetchUserData(page, query);
+        }, 500);
+    }, [fetchUserData]);
+
+    const handleSearch = useCallback((query) => {
+        setSearchQuery(query);
+        setCurrentPage(0);
+        debouncedFetchUserData(0, query);
+    }, [debouncedFetchUserData]);
 
     useEffect(() => {
-        setLoading(true);
-        fetchUserData(currentPage, searchTerm);
-    }, [currentPage, searchTerm]);
+        fetchUserData(0);
+        return () => {
+            if (debounceRef.current) {
+                clearTimeout(debounceRef.current);
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        if (currentPage !== 0) {
+            fetchUserData(currentPage, searchQuery);
+        }
+    }, [currentPage]);
 
     const handleAddUser = async () => {
         try {
@@ -73,10 +105,12 @@ export default function User() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newUserData),
             });
+
             if (!response.ok) {
                 const errorText = await response.text();
                 throw new Error(t('addError') + ': ' + errorText);
             }
+
             setNewUserData({
                 firstName: '',
                 lastName: '',
@@ -86,8 +120,9 @@ export default function User() {
                 role: 'USER',
             });
             setIsAddModalOpen(false);
-            fetchUserData(currentPage, searchTerm);
+            fetchUserData(currentPage, searchQuery);
         } catch (err) {
+            console.error('Add user error:', err);
             alert(err.message);
         }
     };
@@ -107,14 +142,17 @@ export default function User() {
                     role: selectedUser.role,
                 }),
             });
+
             if (!response.ok) {
                 const errorText = await response.text();
                 throw new Error(t('updateError') + ': ' + errorText);
             }
+
             setIsEditModalOpen(false);
             setSelectedUser(null);
-            fetchUserData(currentPage, searchTerm);
+            fetchUserData(currentPage, searchQuery);
         } catch (err) {
+            console.error('Update user error:', err);
             alert(err.message);
         }
     };
@@ -126,21 +164,23 @@ export default function User() {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
             });
+
             if (!response.ok) {
                 const errorText = await response.text();
                 throw new Error(t('deleteError') + ': ' + errorText);
             }
+
             setIsDeleteModalOpen(false);
             setUserToDelete(null);
-            fetchUserData(currentPage, searchTerm);
+            fetchUserData(currentPage, searchQuery);
         } catch (err) {
+            console.error('Delete user error:', err);
             alert(err.message);
         }
     };
 
     const handlePageChange = (page) => {
         if (page >= 0 && page < totalPages && page !== currentPage) {
-            setLoading(true);
             setCurrentPage(page);
         }
     };
@@ -191,8 +231,21 @@ export default function User() {
         setSelectedUser((prev) => ({ ...prev, [name]: value }));
     };
 
-    if (loading) return <div className="min-h-screen p-6 min-w-full flex items-center justify-center"><p>{t('loading')}</p></div>;
-    if (error) return <div className="min-h-screen p-6 min-w-full flex items-center justify-center"><p className="text-red-600">{t('error')}: {error}</p></div>;
+    if (loading) {
+        return (
+            <div className="min-h-screen p-6 min-w-full flex items-center justify-center">
+                <p>{t('loading')}</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="min-h-screen p-6 min-w-full flex items-center justify-center">
+                <p className="text-red-600">{t('error')}: {error}</p>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen p-6 min-w-full overflow-auto">
@@ -223,32 +276,40 @@ export default function User() {
                     </tr>
                     </thead>
                     <tbody>
-                    {userData.map((user) => (
-                        <tr key={user.id} className="border-t border-gray-200 hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">{user.id}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">{user.firstName || 'N/A'}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">{user.lastName || 'N/A'}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">{user.email || 'N/A'}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">{user.department || 'N/A'}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">{user.role || 'N/A'}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                <div className="flex justify-center gap-3">
-                                    <button
-                                        onClick={() => handleOpenEditModal(user)}
-                                        className="p-2 text-blue-700 font-bold rounded-md hover:bg-blue-600 hover:text-white transition duration-200 cursor-pointer"
-                                    >
-                                        <Pencil size={16} />
-                                    </button>
-                                    <button
-                                        onClick={() => handleOpenDeleteModal(user)}
-                                        className="px-2 py-1 text-red-700 font-bold rounded-md hover:bg-red-500 hover:text-white transition duration-200 cursor-pointer"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
+                    {userData.length > 0 ? (
+                        userData.map((user) => (
+                            <tr key={user.id} className="border-t border-gray-200 hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">{user.id}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">{user.firstName || 'N/A'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">{user.lastName || 'N/A'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">{user.email || 'N/A'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">{user.department || 'N/A'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">{user.role || 'N/A'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                    <div className="flex justify-center gap-3">
+                                        <button
+                                            onClick={() => handleOpenEditModal(user)}
+                                            className="p-2 text-blue-700 font-bold rounded-md hover:bg-blue-600 hover:text-white transition duration-200 cursor-pointer"
+                                        >
+                                            <Pencil size={16} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleOpenDeleteModal(user)}
+                                            className="px-2 py-1 text-red-700 font-bold rounded-md hover:bg-red-500 hover:text-white transition duration-200 cursor-pointer"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))
+                    ) : (
+                        <tr>
+                            <td colSpan="7" className="py-4 text-center text-gray-600">
+                                {t('noUsers')}
                             </td>
                         </tr>
-                    ))}
+                    )}
                     </tbody>
                 </table>
                 <div className="flex justify-end items-center p-4">

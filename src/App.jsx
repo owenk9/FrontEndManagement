@@ -3,7 +3,7 @@ import './i18n.js';
 import NavBar from './components/UTCManagement/Nav/NavBar.jsx';
 import Footer from './components/UTCManagement/Nav/Footer.jsx';
 import Homepage from './components/UTCManagement/Home/Homepage.jsx';
-import { Route, Routes, useLocation } from 'react-router-dom';
+import { Route, Routes, useLocation, Navigate } from 'react-router-dom';
 import Category from './components/UTCManagement/Category/Category.jsx';
 import EquipmentList from './components/UTCManagement/Equipment/EquipmentList.jsx';
 import Maintenance from './components/UTCManagement/Maintenance/Maintenance.jsx';
@@ -12,39 +12,47 @@ import Settings from './components/UTCManagement/Setting/Setting.jsx';
 import Location from './components/UTCManagement/Location/Location.jsx';
 import Login from './components/UTCManagement/User/Login.jsx';
 import ProtectedRoute from './components/UTCManagement/ProtectedRoute.jsx';
-import Borrow from "./components/Borrow/Borrow.jsx";
-import User from "./components/UTCManagement/User/User.jsx";
-import MaintenanceHistoryList from "./components/UTCManagement/Equipment/MaintenanceHistoryList.jsx";
-import Statistics from "./components/UTCManagement/Statistics/Statistics.jsx";
-import Broken from "./components/UTCManagement/Broken/Broken.jsx"
-import ResetPassword from "./components/ForgotPassword/ResetPassword.jsx";
-import ForgotPassword from "./components/ForgotPassword/ForgotPassword.jsx";
+import Borrow from './components/Borrow/Borrow.jsx';
+import User from './components/UTCManagement/User/User.jsx';
+import MaintenanceHistoryList from './components/UTCManagement/Equipment/MaintenanceHistoryList.jsx';
+import Statistics from './components/UTCManagement/Statistics/Statistics.jsx';
+import Broken from './components/UTCManagement/Broken/Broken.jsx';
+import ResetPassword from './components/ForgotPassword/ResetPassword.jsx';
+import ForgotPassword from './components/ForgotPassword/ForgotPassword.jsx';
+import { useAuth } from './components/Auth/AuthContext.jsx';
+import { useEffect } from 'react';
+
 function App() {
     const location = useLocation();
+    const { user, loading } = useAuth();
     const isSpecialPage = ['/login', '/borrow', '/forgot-password', '/reset-password'].includes(location.pathname);
+
+
+    useEffect(() => {
+        if (!loading && !user && !isSpecialPage) {
+
+            window.location.href = '/login';
+        }
+    }, [user, loading, isSpecialPage]);
+
     if (isSpecialPage) {
         return (
             <Routes>
-                <Route
-                    path="/login"
-                    element={<Login />} />
-                <Route path="/forgot-password"
-                       element={<ForgotPassword />}
-                />
-                <Route path="/reset-password"
-                       element={<ResetPassword />}
-                />
+                <Route path="/login" element={<Login />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route
                     path="/borrow"
                     element={
-                        <ProtectedRoute requiredAuthorities={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN', "ROLE_USER"]}>
+                        <ProtectedRoute requiredAuthorities={['ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_USER']}>
                             <Borrow />
                         </ProtectedRoute>
                     }
-                    />
+                />
             </Routes>
         );
     }
+
     return (
         <div>
             <NavBar />
@@ -122,7 +130,6 @@ function App() {
                             </ProtectedRoute>
                         }
                     />
-
                     <Route
                         path="/maintenance-history/:equipmentItemId"
                         element={
@@ -131,7 +138,6 @@ function App() {
                             </ProtectedRoute>
                         }
                     />
-
                     <Route
                         path="/statistics"
                         element={
@@ -141,6 +147,7 @@ function App() {
                         }
                     />
 
+                    <Route path="/" element={<Navigate to="/login" replace />} />
                 </Routes>
             </div>
             <Footer />

@@ -17,7 +17,7 @@ export default function EditCategory({ isOpen, onClose, onSave, category, onInpu
                         value={category.id}
                         onChange={onInputChange}
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
-                        disabled // ID không cho sửa
+                        disabled
                     />
                 </div>
                 <div className="mb-4">
