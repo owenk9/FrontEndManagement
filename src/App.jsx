@@ -30,8 +30,12 @@ function App() {
 
     useEffect(() => {
         if (!loading && !user && !isSpecialPage) {
-
-            window.location.href = '/login';
+            const timeout = setTimeout(() => {
+                if (!user) {
+                    window.location.href = '/login';
+                }
+            }, 100);
+            return () => clearTimeout(timeout);
         }
     }, [user, loading, isSpecialPage]);
 

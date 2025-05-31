@@ -263,6 +263,13 @@ i18n
                     tryAgain: "Try Again",
                     resetting: "Resetting...",
                     reportBrokenEquipment: "Broken report",
+
+                    noUsers: 'No user found',
+                    noLocations: "No location found",
+                    noBrokenReports: "No broken report found",
+                    noMaintenanceData: "No maintenance found",
+                    noCategories: "No category found",
+                    noEquipmentFound: 'No equipment found',
                 },
             },
             vi: {

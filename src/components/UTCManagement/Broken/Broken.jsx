@@ -59,7 +59,6 @@ export default function BrokenReports() {
                 url = `${BASE_URL}/broken/get/reports?page=${page}&size=${pageSize}`;
             }
 
-            console.log('Fetching broken reports with URL:', url);
             const response = await fetch(url, {
                 method: 'GET',
                 headers: {
@@ -98,7 +97,7 @@ export default function BrokenReports() {
                 const data = await response.json();
                 console.log('API Response:', data);
                 setReports(data.content || []);
-                setTotalPages(data.totalPages || 1);
+                setTotalPages(data.page.totalPages || 1);
             }
         } catch (err) {
             console.error('Fetch broken reports error:', err);

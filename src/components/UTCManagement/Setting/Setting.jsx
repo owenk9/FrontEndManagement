@@ -101,17 +101,17 @@ export default function Settings() {
                     </button>
                 </div>
 
-                <div>
-                    <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('language')}</h2>
-                    <select
-                        value={language}
-                        onChange={handleLanguageChange}
-                        className="w-full max-w-xs p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black-500"
-                    >
-                        <option value="en">{t('english')}</option>
-                        <option value="vi">{t('vietnamese')}</option>
-                    </select>
-                </div>
+                {/*<div>*/}
+                {/*    <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('language')}</h2>*/}
+                {/*    <select*/}
+                {/*        value={language}*/}
+                {/*        onChange={handleLanguageChange}*/}
+                {/*        className="w-full max-w-xs p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black-500"*/}
+                {/*    >*/}
+                {/*        <option value="en">{t('english')}</option>*/}
+                {/*        <option value="vi">{t('vietnamese')}</option>*/}
+                {/*    </select>*/}
+                {/*</div>*/}
             </div>
 
             {isModalOpen && (

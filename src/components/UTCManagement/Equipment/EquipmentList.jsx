@@ -748,10 +748,10 @@ export default function EquipmentList() {
                                             <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('MAINTENANCE')}`}>
                                                 {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[2] : '0'}
                                             </span>
-                                            <span className="text-gray-500">/</span>
-                                            <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('BORROWED')}`}>
-                                                {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[3] : '0'}
-                                            </span>
+                                            {/*<span className="text-gray-500">/</span>*/}
+                                            {/*<span className={`inline-block px-1 text-xs font-medium ${getStatusColor('BORROWED')}`}>*/}
+                                            {/*    {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[3] : '0'}*/}
+                                            {/*</span>*/}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{equipment.categoryName}</td>

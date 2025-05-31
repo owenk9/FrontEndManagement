@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import SearchBar from '../Nav/SearchBar.jsx';
 import { Pencil, Trash2, Plus } from 'lucide-react';
 import AddUser from './AddUser.jsx';
@@ -6,8 +6,10 @@ import EditUser from './EditUser.jsx';
 import DeleteUser from './DeleteUser.jsx';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../Auth/AuthContext.jsx';
+import debounce from "lodash.debounce";
 
 export default function User() {
+    console.log("rerender`")
     const { t } = useTranslation();
     const { fetchWithAuth } = useAuth();
 
@@ -32,19 +34,19 @@ export default function User() {
     const [pageSize] = useState(10);
     const [searchQuery, setSearchQuery] = useState('');
 
-    const debounceRef = useRef();
     const BASE_URL = 'http://localhost:9090';
 
-    const fetchUserData = useCallback(async (page = 0, query = '') => {
+    const fetchUserData = useCallback(async (page = 0) => {
         try {
             setLoading(true);
             let url;
-            if (query && query.trim() !== '') {
-                url = `${BASE_URL}/user/search?page=${page}&size=${pageSize}&name=${encodeURIComponent(query)}`;
+            if (searchQuery && searchQuery.trim() !== '') {
+                url = `${BASE_URL}/user/search?page=${page}&size=${pageSize}&name=${encodeURIComponent(searchQuery)}`;
             } else {
                 url = `${BASE_URL}/user/get?page=${page}&size=${pageSize}`;
             }
 
+            console.log('Fetching user data with URL:', url);
             const response = await fetchWithAuth(url, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
@@ -57,7 +59,7 @@ export default function User() {
 
             const data = await response.json();
             setUserData(data.content || []);
-            setTotalPages(data.totalPages || 1);
+            setTotalPages(data.page.totalPages || 1);
         } catch (err) {
             console.error('Fetch user error:', err);
             setError(err.message);
@@ -66,37 +68,33 @@ export default function User() {
         } finally {
             setLoading(false);
         }
-    }, [fetchWithAuth, pageSize, t]);
+    }, [fetchWithAuth, pageSize, searchQuery,t]);
 
-    const debouncedFetchUserData = useCallback((page, query) => {
-        if (debounceRef.current) {
-            clearTimeout(debounceRef.current);
-        }
-        debounceRef.current = setTimeout(() => {
-            fetchUserData(page, query);
-        }, 500);
-    }, [fetchUserData]);
-
-    const handleSearch = useCallback((query) => {
+    const debouncedFetchUserData = useCallback(
+        debounce((page) => {
+            fetchUserData(page);
+        }, 200),
+        [fetchUserData]
+    );
+    const handleSearch = (query) => {
         setSearchQuery(query);
         setCurrentPage(0);
-        debouncedFetchUserData(0, query);
-    }, [debouncedFetchUserData]);
+    };
 
     useEffect(() => {
-        fetchUserData(0);
-        return () => {
-            if (debounceRef.current) {
-                clearTimeout(debounceRef.current);
-            }
-        };
-    }, []);
+        setLoading(true);
+        setCurrentPage(0);
+        debouncedFetchUserData(0);
+        return () => debouncedFetchUserData.cancel();
+
+    }, [searchQuery, debouncedFetchUserData]);
 
     useEffect(() => {
         if (currentPage !== 0) {
-            fetchUserData(currentPage, searchQuery);
+            debouncedFetchUserData(currentPage);
         }
-    }, [currentPage]);
+        return () => debouncedFetchUserData.cancel();
+    }, [currentPage, debouncedFetchUserData]);
 
     const handleAddUser = async () => {
         try {
@@ -181,6 +179,7 @@ export default function User() {
 
     const handlePageChange = (page) => {
         if (page >= 0 && page < totalPages && page !== currentPage) {
+            setLoading(true);
             setCurrentPage(page);
         }
     };
@@ -231,13 +230,7 @@ export default function User() {
         setSelectedUser((prev) => ({ ...prev, [name]: value }));
     };
 
-    if (loading) {
-        return (
-            <div className="min-h-screen p-6 min-w-full flex items-center justify-center">
-                <p>{t('loading')}</p>
-            </div>
-        );
-    }
+
 
     if (error) {
         return (
@@ -253,7 +246,7 @@ export default function User() {
                 <h1 className="text-3xl font-bold text-gray-900">{t('user')}</h1>
             </div>
             <div className="mb-6 flex justify-between items-center">
-                <SearchBar onSearch={handleSearch} />
+                <SearchBar onSearch={handleSearch} /> {/* Loại bỏ value, để SearchBar tự quản lý */}
                 <button
                     className="flex items-center gap-2 bg-black text-white py-2 px-4 rounded-md hover:bg-gray-700 transition duration-200"
                     onClick={handleOpenAddModal}
@@ -276,7 +269,13 @@ export default function User() {
                     </tr>
                     </thead>
                     <tbody>
-                    {userData.length > 0 ? (
+                    {loading ? (
+                            <tr>
+                                <td colSpan="9" className="py-4 text-center text-gray-600">
+                                    {t('loading')}...
+                                </td>
+                            </tr>
+                        ) : userData.length > 0 ? (
                         userData.map((user) => (
                             <tr key={user.id} className="border-t border-gray-200 hover:bg-gray-50">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm">{user.id}</td>
@@ -319,7 +318,7 @@ export default function User() {
                                 currentPage === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-700'
                             }`}
                             onClick={() => handlePageChange(currentPage - 1)}
-                            disabled={currentPage === 0}
+                            disabled={currentPage === 0 || loading}
                         >
                             {t('previous')}
                         </button>
@@ -329,7 +328,7 @@ export default function User() {
                                 currentPage === totalPages - 1 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-700'
                             }`}
                             onClick={() => handlePageChange(currentPage + 1)}
-                            disabled={currentPage === totalPages - 1}
+                            disabled={currentPage === totalPages - 1 || loading}
                         >
                             {t('next')}
                         </button>

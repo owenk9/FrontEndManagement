@@ -49,7 +49,7 @@ export default function AddEquipmentItem({ isOpen, onClose, onSave, newEquipment
                         <option value="ACTIVE">{t('statusActive')}</option>
                         <option value="BROKEN">{t('statusBroken')}</option>
                         <option value="MAINTENANCE">{t('statusMaintenance')}</option>
-                        <option value="BORROWED">{t('statusBorrowed')}</option>
+
                     </select>
                 </div>
                 <div className="mb-4">

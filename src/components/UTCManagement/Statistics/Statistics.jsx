@@ -22,7 +22,7 @@ export default function ReportsDashboard() {
     const [brokenTotalPages, setBrokenTotalPages] = useState(1);
     const [, setMaintenanceTotalElements] = useState(0);
     const [, setBrokenTotalElements] = useState(0);
-    const [pageSize] = useState(10);
+    const [pageSize] = useState(5);
 
     const BASE_URL = 'http://localhost:9090';
 
@@ -46,8 +46,8 @@ export default function ReportsDashboard() {
 
             const result = await response.json();
             setMaintenanceData(result.content || []);
-            setMaintenanceTotalPages(result.totalPages || 1);
-            setMaintenanceTotalElements(result.totalElements || 0);
+            setMaintenanceTotalPages(result.page.totalPages || 1);
+            setMaintenanceTotalElements(result.page.totalElements || 0);
         } catch (err) {
             console.error('Fetch maintenance reports error:', err);
             setError(err.message);
@@ -169,7 +169,7 @@ export default function ReportsDashboard() {
                     onClick={() => handleMaintenancePageChange(i)}
                     className={`px-3 py-1 rounded-md ${
                         maintenancePage === i
-                            ? 'bg-blue-600 text-white'
+                            ? 'bg-black text-white'
                             : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                     }`}
                 >
@@ -197,7 +197,7 @@ export default function ReportsDashboard() {
                     onClick={() => handleBrokenPageChange(i)}
                     className={`px-3 py-1 rounded-md ${
                         brokenPage === i
-                            ? 'bg-blue-600 text-white'
+                            ? 'bg-black text-white'
                             : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                     }`}
                 >
@@ -405,7 +405,7 @@ export default function ReportsDashboard() {
                         <div className="flex gap-2">
                             <button
                                 className={`px-3 py-1 rounded-md ${
-                                    maintenancePage === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'
+                                    maintenancePage === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-blue-700'
                                 }`}
                                 onClick={() => handleMaintenancePageChange(maintenancePage - 1)}
                                 disabled={maintenancePage === 0 || loading}
@@ -415,7 +415,7 @@ export default function ReportsDashboard() {
                             {renderMaintenancePageNumbers()}
                             <button
                                 className={`px-3 py-1 rounded-md ${
-                                    maintenancePage === maintenanceTotalPages - 1 ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'
+                                    maintenancePage === maintenanceTotalPages - 1 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-blue-700'
                                 }`}
                                 onClick={() => handleMaintenancePageChange(maintenancePage + 1)}
                                 disabled={maintenancePage === maintenanceTotalPages - 1 || loading}

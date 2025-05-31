@@ -612,10 +612,10 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                                             <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('MAINTENANCE')}`}>
                                                 {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[2] : '0'}
                                             </span>
-                                            <span className="text-gray-500">/</span>
-                                            <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('BORROWED')}`}>
-                                                {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[3] : '0'}
-                                            </span>
+                                            {/*<span className="text-gray-500">/</span>*/}
+                                            {/*<span className={`inline-block px-1 text-xs font-medium ${getStatusColor('BORROWED')}`}>*/}
+                                            {/*    {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[3] : '0'}*/}
+                                            {/*</span>*/}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{equipment.categoryName || '-'}</td>
@@ -660,9 +660,9 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                                                                     <div className="text-sm text-gray-600">
                                                                         <span className="font-medium">{t('location')}:</span> {item.locationName || '-'}
                                                                     </div>
-                                                                    <div className="text-sm text-gray-600">
-                                                                        <span className="font-medium">{t('returnDate')}:</span> {formatReturnDate(item.returnDate)}
-                                                                    </div>
+                                                                    {/*<div className="text-sm text-gray-600">*/}
+                                                                    {/*    <span className="font-medium">{t('returnDate')}:</span> {formatReturnDate(item.returnDate)}*/}
+                                                                    {/*</div>*/}
                                                                 </div>
                                                             </div>
                                                         ))}

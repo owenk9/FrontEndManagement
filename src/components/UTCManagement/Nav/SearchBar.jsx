@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { useState, useEffect, useCallback } from 'react';
 import debounce from 'lodash.debounce';
 
-export default function SearchBar({ onSearch }) {
+export default function SearchBar({ onSearch, placeholder = 'Search...' }) {
     const { t } = useTranslation();
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -15,9 +15,9 @@ export default function SearchBar({ onSearch }) {
 
     const handleSearch = (e) => {
         const value = e.target.value;
-        setSearchTerm(value);
+        setSearchTerm(value); // Cập nhật state nội bộ
         debouncedSearch(value);
-        console.log(value);
+        console.log('SearchBar value:', value);
     };
 
     useEffect(() => {
@@ -30,9 +30,9 @@ export default function SearchBar({ onSearch }) {
         <div className="relative w-64">
             <input
                 type="text"
-                value={searchTerm}
+                value={searchTerm} // Sử dụng state nội bộ
                 onChange={handleSearch}
-                placeholder={t('searchByEquipmentName')}
+                placeholder={placeholder || t('searchByEquipmentName')}
                 className="w-full p-2 pl-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
             />
             <svg

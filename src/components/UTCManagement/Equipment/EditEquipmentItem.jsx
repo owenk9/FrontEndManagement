@@ -48,7 +48,7 @@ export default function EditEquipmentItem({ isOpen, onClose, onSave, equipmentIt
                         <option value="ACTIVE">{t('statusActive')}</option>
                         <option value="BROKEN">{t('statusBroken')}</option>
                         <option value="MAINTENANCE">{t('statusMaintenance')}</option>
-                        <option value="BORROWED">{t('statusBorrowed')}</option>
+
                     </select>
                 </div>
                 <div className="mb-4">

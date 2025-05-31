@@ -24,12 +24,16 @@ export default function ForgotPassword() {
             });
 
             if (!response.ok) {
-                throw new Error(await response.text());
+                const errorText = await response.text();
+                if (response.status === 404 || errorText.toLowerCase().includes('not found')) {
+                    throw new Error('Email not found');
+                }
+                throw new Error(errorText || t('forgotPasswordError'));
             }
 
             setMessage(t('resetPasswordLinkSent'));
         } catch (err) {
-            setError(err.message || t('forgotPasswordError'));
+            setError(err.message); // Hiển thị "Email not found" nếu khớp điều kiện
         } finally {
             setLoading(false);
         }
@@ -54,8 +58,8 @@ export default function ForgotPassword() {
                             required
                         />
                     </div>
-                    {message && <p className="text-red-600 mb-4">{message}</p>}
-                    {error && <p className="text-red-600 mb-4">{error}</p>}
+                    {message && <p className="text-green-600 mb-4">{message}</p>} {/* Thay đổi màu xanh cho thông báo thành công */}
+                    {error && <p className="text-red-600 mb-4">{error}</p>} {/* Giữ màu đỏ cho lỗi */}
                     <button
                         type="submit"
                         className="w-full bg-black text-white p-3 rounded-md hover:bg-gray-800 transition-colors"

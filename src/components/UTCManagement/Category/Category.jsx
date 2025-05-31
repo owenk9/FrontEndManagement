@@ -1,19 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import SearchBar from '../Nav/SearchBar.jsx';
 import AddCategoryModal from './AddCategory.jsx';
 import EditCategory from './EditCategory.jsx';
 import DeleteCategory from './DeleteCategory.jsx';
 import { Pencil, Trash2, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import {useAuth} from "../../Auth/AuthContext.jsx";
+import { useAuth } from "../../Auth/AuthContext.jsx";
+import debounce from 'lodash.debounce';
 
 export default function Category() {
     const { t } = useTranslation();
+    const { fetchWithAuth } = useAuth();
 
     const [categoryData, setCategoryData] = useState([]);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const { fetchWithAuth } = useAuth();
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [newCategoryData, setNewCategoryData] = useState({
         categoryName: '',
@@ -26,38 +27,68 @@ export default function Category() {
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
     const [pageSize] = useState(10);
-    const [searchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState(''); // Đổi từ const thành state để phản ánh từ khóa
 
     const BASE_URL = 'http://localhost:9090';
 
-    const fetchCategoryData = async (page = 0, search = '') => {
+    const fetchCategoryData = useCallback(async (page = 0, search = '') => {
         try {
-            const url = search
+            setLoading(true);
+            const url = search && search.trim() !== ''
                 ? `${BASE_URL}/category/get?name=${encodeURIComponent(search)}&page=${page}&size=${pageSize}`
                 : `${BASE_URL}/category/get?page=${page}&size=${pageSize}`;
+
+            console.log('Fetching category data with URL:', url);
             const response = await fetchWithAuth(url, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
-            if (!response.ok) throw new Error(t('fetchError'));
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`${t('fetchError')}: ${errorText}`);
+            }
+
             const data = await response.json();
             setCategoryData(data.content || []);
-            setTotalPages(data.page.totalPages || 1);
+            setTotalPages(data.page?.totalPages || 1);
         } catch (err) {
+            console.error('Fetch category error:', err);
             setError(err.message);
+            setCategoryData([]);
+            setTotalPages(1);
         } finally {
             setLoading(false);
         }
-    };
+    }, [fetchWithAuth, pageSize, t]);
 
-    const handleSearch = (term) => {
-        fetchCategoryData(currentPage, term);
-    };
+    const debouncedFetchCategoryData = useCallback(
+        debounce((page, search) => {
+            console.log('Debounced fetch triggered for page:', page, 'with searchTerm:', search);
+            fetchCategoryData(page, search);
+        }, 200),
+        [fetchCategoryData]
+    );
+
+    const handleSearch = useCallback((term) => {
+        console.log('Search term updated:', term);
+        setSearchTerm(term);
+        setCurrentPage(0); // Reset to first page on new search
+    }, []);
 
     useEffect(() => {
         setLoading(true);
-        fetchCategoryData(currentPage, searchTerm);
-    }, [currentPage, searchTerm]);
+        setCurrentPage(0);
+        debouncedFetchCategoryData(0, searchTerm);
+        return () => debouncedFetchCategoryData.cancel();
+    }, [searchTerm, debouncedFetchCategoryData]);
+
+    useEffect(() => {
+        if (currentPage !== 0) {
+            debouncedFetchCategoryData(currentPage, searchTerm);
+        }
+        return () => debouncedFetchCategoryData.cancel();
+    }, [currentPage, debouncedFetchCategoryData]);
 
     const handleOpenAddModal = () => {
         setIsAddModalOpen(true);
@@ -74,7 +105,10 @@ export default function Category() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newCategoryData),
             });
-            if (!response.ok) throw new Error(t('addError'));
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(t('addError') + ': ' + errorText);
+            }
             setNewCategoryData({ categoryName: '', description: '' });
             setIsAddModalOpen(false);
             fetchCategoryData(currentPage, searchTerm);
@@ -102,7 +136,10 @@ export default function Category() {
                     description: selectedCategory.description,
                 }),
             });
-            if (!response.ok) throw new Error(t('updateError'));
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(t('updateError') + ': ' + errorText);
+            }
             setIsEditModalOpen(false);
             setSelectedCategory(null);
             fetchCategoryData(currentPage, searchTerm);
@@ -122,7 +159,10 @@ export default function Category() {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
             });
-            if (!response.ok) throw new Error(t('deleteError'));
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(t('deleteError') + ': ' + errorText);
+            }
             setIsDeleteModalOpen(false);
             setCategoryToDelete(null);
             fetchCategoryData(currentPage, searchTerm);
@@ -142,12 +182,11 @@ export default function Category() {
     };
 
     const handlePageChange = (page) => {
-        if (page >= 0 && page < totalPages  && page !== currentPage) {
+        if (page >= 0 && page < totalPages && page !== currentPage) {
             setLoading(true);
             setCurrentPage(page);
         }
     };
-
 
     const renderPageNumbers = () => {
         const pageNumbers = [];
@@ -178,8 +217,12 @@ export default function Category() {
         return pageNumbers;
     };
 
-    if (loading) return <div className="min-h-screen p-6 min-w-full flex items-center justify-center"><p>{t('loading')}</p></div>;
-    if (error) return <div className="min-h-screen p-6 min-w-full flex items-center justify-center"><p className="text-red-600">{t('error')}: {error}</p></div>;
+
+    if (error) return (
+        <div className="min-h-screen p-6 min-w-full flex items-center justify-center">
+            <p className="text-red-600">{t('error')}: {error}</p>
+        </div>
+    );
 
     return (
         <div className="min-h-screen p-6 min-w-full overflow-auto">
@@ -207,32 +250,45 @@ export default function Category() {
                     </tr>
                     </thead>
                     <tbody>
-                    {categoryData.map((category) => (
-                        <tr key={category.id} className="border-t border-gray-200 hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{category.id}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{category.categoryName}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{category.description}</td>
-                            <td className="py-4 px-6 text-center">
-                                <div className="flex space-x-3">
-                                    <button
-                                        className="p-2 text-blue-700 font-bold rounded-md hover:bg-blue-600 hover:text-white transition duration-200 cursor-pointer"
-                                        onClick={() => handleOpenEditModal(category)}
-                                    >
-                                        <Pencil size={16} />
-                                    </button>
-                                    <button
-                                        className="px-2 py-1 text-red-700 font-bold rounded-md hover:bg-red-500 hover:text-white transition duration-200 cursor-pointer"
-                                        onClick={() => handleOpenDeleteModal(category)}
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
+                    {loading ? (
+                            <tr>
+                                <td colSpan="9" className="py-4 text-center text-gray-600">
+                                    {t('loading')}...
+                                </td>
+                            </tr>
+                        ) : categoryData.length > 0 ? (
+                        categoryData.map((category) => (
+                            <tr key={category.id} className="border-t border-gray-200 hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{category.id}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{category.categoryName}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{category.description || 'N/A'}</td>
+                                <td className="py-4 px-6 text-center">
+                                    <div className="flex space-x-3">
+                                        <button
+                                            className="p-2 text-blue-700 font-bold rounded-md hover:bg-blue-600 hover:text-white transition duration-200 cursor-pointer"
+                                            onClick={() => handleOpenEditModal(category)}
+                                        >
+                                            <Pencil size={16} />
+                                        </button>
+                                        <button
+                                            className="px-2 py-1 text-red-700 font-bold rounded-md hover:bg-red-500 hover:text-white transition duration-200 cursor-pointer"
+                                            onClick={() => handleOpenDeleteModal(category)}
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))
+                    ) : (
+                        <tr>
+                            <td colSpan="4" className="py-4 text-center text-gray-600">
+                                {t('noCategories')}
                             </td>
                         </tr>
-                    ))}
+                    )}
                     </tbody>
                 </table>
-                {/* Phân trang nằm trong bảng, căn phải */}
                 <div className="flex justify-end items-center p-4">
                     <div className="flex gap-2">
                         <button
@@ -240,7 +296,7 @@ export default function Category() {
                                 currentPage === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-700'
                             }`}
                             onClick={() => handlePageChange(currentPage - 1)}
-                            disabled={currentPage === 0}
+                            disabled={currentPage === 0 || loading}
                         >
                             {t('previous')}
                         </button>
@@ -250,7 +306,7 @@ export default function Category() {
                                 currentPage === totalPages - 1 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-700'
                             }`}
                             onClick={() => handlePageChange(currentPage + 1)}
-                            disabled={currentPage === totalPages - 1}
+                            disabled={currentPage === totalPages - 1 || loading}
                         >
                             {t('next')}
                         </button>
