@@ -19,7 +19,7 @@ export default function MaintenanceHistoryList() {
     const [totalPages, setTotalPages] = useState(1);
     const [pageSize] = useState(10); // Theo backend
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterTechnician, setFilterTechnician] = useState(''); // Bộ lọc theo technician
+    // const [filterTechnician, setFilterTechnician] = useState(''); // Bộ lọc theo technician
     const BASE_URL = 'http://localhost:9090';
     const serialNumber = location.state?.serialNumber || 'Unknown';
 
@@ -53,20 +53,20 @@ export default function MaintenanceHistoryList() {
     };
 
     useEffect(() => {
-        fetchMaintenanceHistory(currentPage, searchTerm, filterTechnician);
-    }, [currentPage, searchTerm, filterTechnician, equipmentItemId]);
+        fetchMaintenanceHistory(currentPage, searchTerm);
+    }, [currentPage, searchTerm, equipmentItemId]);
 
     const handleSearch = (term) => {
         setSearchTerm(term);
-        fetchMaintenanceHistory(0, term, filterTechnician);
+        fetchMaintenanceHistory(0, term);
     };
 
-    const handleFilterChange = (type, value) => {
-        if (type === 'technician') {
-            setFilterTechnician(value);
-            fetchMaintenanceHistory(0, searchTerm, value);
-        }
-    };
+    // const handleFilterChange = (type, value) => {
+    //     if (type === 'technician') {
+    //         setFilterTechnician(value);
+    //         fetchMaintenanceHistory(0, searchTerm, value);
+    //     }
+    // };
 
     const handlePageChange = (page) => {
         if (page >= 0 && page < totalPages && page !== currentPage) {
@@ -109,21 +109,21 @@ export default function MaintenanceHistoryList() {
         }
     };
 
-    if (loading && history.length === 0) {
-        return (
-            <div className="min-h-screen p-6 flex items-center justify-center">
-                <Loader2 size={24} className="animate-spin mr-2" />
-                <p>{t('loading')}</p>
-            </div>
-        );
-    }
+    // if (loading && history.length === 0) {
+    //     return (
+    //         <div className="min-h-screen p-6 flex items-center justify-center">
+    //             <Loader2 size={24} className="animate-spin mr-2" />
+    //             <p>{t('loading')}</p>
+    //         </div>
+    //     );
+    // }
 
     if (error) {
         return (
             <div className="min-h-screen p-6 flex items-center justify-center">
                 <p className="text-red-600">{t('error')}: {error}</p>
                 <button
-                    onClick={() => fetchMaintenanceHistory(currentPage, searchTerm, filterTechnician)}
+                    onClick={() => fetchMaintenanceHistory(currentPage, searchTerm)}
                     className="ml-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                 >
                     {t('retry')}
@@ -141,17 +141,17 @@ export default function MaintenanceHistoryList() {
             </div>
             <div className="mb-6 flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                    <SearchBar onSearch={handleSearch} />
-                    <select
-                        value={filterTechnician}
-                        onChange={(e) => handleFilterChange('technician', e.target.value)}
-                        className="border border-gray-300 rounded-md p-2 h-10"
-                    >
-                        <option value="">{t('allTechnicians')}</option>
-                        {/* Giả sử bạn có danh sách technician từ API hoặc state, hiện tại chỉ để placeholder */}
-                        <option value="Technician A">Technician A</option>
-                        <option value="Technician B">Technician B</option>
-                    </select>
+                    {/*<SearchBar onSearch={handleSearch} />*/}
+                    {/*<select*/}
+                    {/*    value={filterTechnician}*/}
+                    {/*    onChange={(e) => handleFilterChange('technician', e.target.value)}*/}
+                    {/*    className="border border-gray-300 rounded-md p-2 h-10"*/}
+                    {/*>*/}
+                    {/*    <option value="">{t('allTechnicians')}</option>*/}
+                    {/*    /!* Giả sử bạn có danh sách technician từ API hoặc state, hiện tại chỉ để placeholder *!/*/}
+                    {/*    <option value="Technician A">Technician A</option>*/}
+                    {/*    <option value="Technician B">Technician B</option>*/}
+                    {/*</select>*/}
                 </div>
             </div>
             <div className="bg-white shadow-md rounded-lg mb-4">

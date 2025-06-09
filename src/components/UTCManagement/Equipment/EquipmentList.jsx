@@ -1,4 +1,6 @@
 import { useState, useEffect, Fragment, useCallback } from 'react';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import SearchBar from '../Nav/SearchBar.jsx';
 import { Pencil, Trash2, Plus, ChevronDown, ChevronUp, Loader2, History } from 'lucide-react';
 import AddEquipment from './AddEquipment.jsx';
@@ -47,12 +49,12 @@ export default function EquipmentList() {
     });
     const [selectedEquipmentItem, setSelectedEquipmentItem] = useState(null);
     const [equipmentItemToDelete, setEquipmentItemToDelete] = useState(null);
-    const [loading, setLoading] = useState(false); // Aligned with BorrowTable's initial state
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
     const [pageSize] = useState(10);
-    const [searchQuery, setSearchQuery] = useState(''); // Renamed to searchQuery to match BorrowTable
+    const [searchQuery, setSearchQuery] = useState('');
     const [expandedEquipmentId, setExpandedEquipmentId] = useState(null);
     const [equipmentItems, setEquipmentItems] = useState({});
     const [itemsLoading, setItemsLoading] = useState({});
@@ -70,7 +72,6 @@ export default function EquipmentList() {
             if (filterLocationId) url += `&locationId=${filterLocationId}`;
             if (filterCategoryId) url += `&categoryId=${filterCategoryId}`;
 
-            console.log('Fetching equipment data with URL:', url);
             const response = await fetchWithAuth(url, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
@@ -80,7 +81,6 @@ export default function EquipmentList() {
                 throw new Error(`API Error: ${response.status} - ${errorText || t('fetchError')}`);
             }
             const data = await response.json();
-            console.log('API Response:', data);
             const equipmentList = data.content || [];
             const quantities = {};
             await Promise.all(
@@ -111,6 +111,14 @@ export default function EquipmentList() {
             setError(err.message);
             setEquipmentData([]);
             setTotalPages(1);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         } finally {
             setLoading(false);
         }
@@ -129,10 +137,17 @@ export default function EquipmentList() {
             });
             if (!response.ok) throw new Error(t('fetchError'));
             const data = await response.json();
-            console.log('Fetched equipment items:', data);
             setEquipmentItems((prev) => ({ ...prev, [equipmentId]: data || [] }));
         } catch (err) {
             console.error('Failed to fetch equipment items:', err);
+            toast.error(t('fetchError'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         } finally {
             setItemsLoading((prev) => ({ ...prev, [equipmentId]: false }));
         }
@@ -164,6 +179,14 @@ export default function EquipmentList() {
             setCategories(data.content || []);
         } catch (err) {
             console.error('Failed to fetch categories:', err);
+            toast.error(t('fetchError'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         }
     };
 
@@ -178,6 +201,14 @@ export default function EquipmentList() {
             setLocations(data.content || []);
         } catch (err) {
             console.error('Failed to fetch locations:', err);
+            toast.error(t('fetchError'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         }
     };
 
@@ -191,7 +222,7 @@ export default function EquipmentList() {
 
     const handleSearch = (query) => {
         setSearchQuery(query);
-        setCurrentPage(0); // Reset to first page on new search
+        setCurrentPage(0);
     };
 
     const handleFilterChange = (type, value) => {
@@ -205,7 +236,7 @@ export default function EquipmentList() {
             default:
                 break;
         }
-        setCurrentPage(0); // Reset to first page on filter change
+        setCurrentPage(0);
     };
 
     useEffect(() => {
@@ -216,9 +247,9 @@ export default function EquipmentList() {
     }, [searchQuery, filterLocationId, filterCategoryId, debouncedFetchEquipmentData]);
 
     useEffect(() => {
-        if (currentPage !== 0) {
+
             debouncedFetchEquipmentData(currentPage);
-        }
+
         return () => debouncedFetchEquipmentData.cancel();
     }, [currentPage, debouncedFetchEquipmentData]);
 
@@ -233,6 +264,28 @@ export default function EquipmentList() {
     }, [equipmentData]);
 
     const handleAddEquipment = async () => {
+        if (!newEquipmentData.name) {
+            toast.error('Add fail. Please fill equipment name', {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
+            return;
+        }
+        if (!newEquipmentData.categoryId) {
+            toast.error('Add fail. Please select a category', {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
+            return;
+        }
         try {
             const formData = new FormData();
             const equipmentData = {
@@ -255,8 +308,21 @@ export default function EquipmentList() {
 
             if (!response.ok) {
                 const errorText = await response.text();
-                throw new Error(t('addError') + ': ' + errorText);
+                const errorMessage = JSON.parse(errorText);
+                if (response.status === 409 && errorMessage.message.includes('already exists')) {
+                    throw new Error(`Add fail. Equipment with name ${newEquipmentData.name} already exists`);
+                }
+                throw new Error(`Add fail. ${t('addError')}`);
             }
+
+            toast.success(t('equipmentAddedSuccessfully'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
 
             setNewEquipmentData({
                 name: '',
@@ -272,11 +338,40 @@ export default function EquipmentList() {
             fetchEquipmentData(currentPage);
         } catch (err) {
             console.error('Failed to add equipment:', err);
-            alert(err.message);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         }
     };
 
     const handleAddEquipmentItem = async () => {
+        if (!newEquipmentItemData.serialNumber) {
+            toast.error('Add fail. Please fill serial number', {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
+            return;
+        }
+        if (!newEquipmentItemData.locationId) {
+            toast.error('Add fail. Please select a location', {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
+            return;
+        }
         try {
             const itemData = {
                 serialNumber: newEquipmentItemData.serialNumber,
@@ -294,8 +389,21 @@ export default function EquipmentList() {
 
             if (!response.ok) {
                 const errorText = await response.text();
-                throw new Error(t('addItemError') + ': ' + errorText);
+                const errorMessage = JSON.parse(errorText);
+                if (response.status === 409 && errorMessage.message.includes('already exists')) {
+                    throw new Error(`Add fail. Serial number ${newEquipmentItemData.serialNumber} already exists`);
+                }
+                throw new Error(`Add fail. ${t('addItemError')}`);
             }
+
+            toast.success(t('equipmentItemAddedSuccessfully'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
 
             setNewEquipmentItemData({
                 serialNumber: '',
@@ -313,11 +421,112 @@ export default function EquipmentList() {
             }
         } catch (err) {
             console.error('Failed to add equipment item:', err);
-            alert(err.message);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
+        }
+    };
+
+    const handleEditEquipment = async () => {
+        if (!selectedEquipment.categoryId) {
+            toast.error('Update fail. Please select a category', {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
+            return;
+        }
+        if (!selectedEquipment.name) {
+            toast.error(t('equipmentNameRequired'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
+            return;
+        }
+        try {
+            const formData = new FormData();
+            const equipmentData = {
+                name: selectedEquipment.name,
+                status: selectedEquipment.status || 'Active',
+                purchaseDate: selectedEquipment.purchaseDate || new Date().toISOString().slice(0, 16),
+                description: selectedEquipment.description || '',
+                quantity: parseInt(selectedEquipment.quantity) || 1,
+                categoryId: parseInt(selectedEquipment.categoryId) || 1,
+                locationId: parseInt(selectedEquipment.locationId) || 1,
+            };
+            const equipmentBlob = new Blob([JSON.stringify(equipmentData)], { type: 'application/json' });
+            formData.append('equipment', equipmentBlob);
+            if (selectedEquipment.image instanceof File) formData.append('image', selectedEquipment.image);
+
+            const response = await fetchWithAuth(`${BASE_URL}/equipment/update/${selectedEquipment.id}`, {
+                method: 'PATCH',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                const errorMessage = JSON.parse(errorText);
+                if (response.status === 409 && errorMessage.message.includes('already exists')) {
+                    throw new Error(`Update fail. Equipment with name ${newEquipmentData.name} already exists`);
+                }
+                throw new Error(`Update fail. ${t('updateError')}`);
+                // const errorText = await response.text();
+                // throw new Error(t('updateError') + ': ' + errorText);
+            }
+
+            toast.success(t('equipmentUpdatedSuccessfully'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
+
+            setIsEditModalOpen(false);
+            setSelectedEquipment(null);
+            fetchEquipmentData(currentPage);
+
+            if (expandedEquipmentId === selectedEquipment.id) {
+                fetchEquipmentItems(selectedEquipment.id);
+            }
+        } catch (err) {
+            console.error('Failed to update equipment:', err);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         }
     };
 
     const handleEditEquipmentItem = async () => {
+        if (!selectedEquipmentItem.locationId) {
+            toast.error('Update fail. Please select a location', {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
+            return;
+        }
         try {
             const itemData = {
                 serialNumber: selectedEquipmentItem.serialNumber,
@@ -344,15 +553,73 @@ export default function EquipmentList() {
                 body: JSON.stringify(itemData),
             });
 
-            if (!response.ok) throw new Error(t('updateItemError'));
+            // if (!response.ok) {
+            //     await response.text();
+            //     throw new Error(`Update fail. ${t('updateItemError')}`);
+            // }
+            if (!response.ok) {
+                const errorText = await response.text();
+                const errorMessage = JSON.parse(errorText);
+                if (response.status === 409 && errorMessage.message.includes('already exists')) {
+                    throw new Error(`Update fail. Serial number ${newEquipmentItemData.serialNumber} already exists`);
+                }
+                throw new Error(`Update fail. ${t('updateItemError')}`);
+            }
+
+            toast.success(t('equipmentItemUpdatedSuccessfully'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
 
             setIsEditItemModalOpen(false);
             setSelectedEquipmentItem(null);
             fetchEquipmentItems(selectedEquipmentItem.equipmentId);
         } catch (err) {
             console.error('Failed to update equipment item:', err);
-            alert(err.message);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             fetchEquipmentItems(selectedEquipmentItem.equipmentId);
+        }
+    };
+
+    const handleDeleteEquipment = async () => {
+        try {
+            const response = await fetchWithAuth(`${BASE_URL}/equipment/delete/${equipmentToDelete.id}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            if (!response.ok) throw new Error(`Delete fail. ${t('deleteError')}`);
+            toast.success(t('equipmentDeletedSuccessfully'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
+            setIsDeleteModalOpen(false);
+            setEquipmentToDelete(null);
+            fetchEquipmentData(currentPage);
+        } catch (err) {
+            console.error(err);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         }
     };
 
@@ -374,75 +641,31 @@ export default function EquipmentList() {
                 headers: { 'Content-Type': 'application/json' },
             });
 
-            if (!response.ok) throw new Error(t('deleteItemError'));
+            if (!response.ok) throw new Error(`Delete fail. ${t('deleteItemError')}`);
+
+            toast.success(t('equipmentItemDeletedSuccessfully'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
 
             fetchEquipmentData(currentPage);
             setIsDeleteItemModalOpen(false);
             setEquipmentItemToDelete(null);
         } catch (err) {
             console.error('Failed to delete equipment item:', err);
-            alert(err.message);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             fetchEquipmentItems(equipmentItemToDelete.equipmentId);
-        }
-    };
-
-    const handleEditEquipment = async () => {
-        if (!selectedEquipment.name) {
-            alert(t('equipmentNameRequired'));
-            return;
-        }
-        try {
-            const formData = new FormData();
-            const equipmentData = {
-                name: selectedEquipment.name,
-                status: selectedEquipment.status || 'Active',
-                purchaseDate: selectedEquipment.purchaseDate || new Date().toISOString().slice(0, 16),
-                description: selectedEquipment.description || '',
-                quantity: parseInt(selectedEquipment.quantity) || 1,
-                categoryId: parseInt(selectedEquipment.categoryId) || 1,
-                locationId: parseInt(selectedEquipment.locationId) || 1,
-            };
-            const equipmentBlob = new Blob([JSON.stringify(equipmentData)], { type: 'application/json' });
-            formData.append('equipment', equipmentBlob);
-            if (selectedEquipment.image instanceof File) formData.append('image', selectedEquipment.image);
-
-            const response = await fetchWithAuth(`${BASE_URL}/equipment/update/${selectedEquipment.id}`, {
-                method: 'PATCH',
-                body: formData,
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Update failed with status:', response.status, 'Response:', errorText);
-                throw new Error(t('updateError'));
-            }
-
-            setIsEditModalOpen(false);
-            setSelectedEquipment(null);
-            fetchEquipmentData(currentPage);
-
-            if (expandedEquipmentId === selectedEquipment.id) {
-                fetchEquipmentItems(selectedEquipment.id);
-            }
-        } catch (err) {
-            console.error('Failed to update equipment:', err);
-            alert(err.message);
-        }
-    };
-
-    const handleDeleteEquipment = async () => {
-        try {
-            const response = await fetchWithAuth(`${BASE_URL}/equipment/delete/${equipmentToDelete.id}`, {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-            });
-            if (!response.ok) throw new Error(t('deleteError'));
-            setIsDeleteModalOpen(false);
-            setEquipmentToDelete(null);
-            fetchEquipmentData(currentPage);
-        } catch (err) {
-            console.error(err);
-            alert(err.message);
         }
     };
 
@@ -469,8 +692,6 @@ export default function EquipmentList() {
                 return t('statusBroken');
             case 'MAINTENANCE':
                 return t('statusMaintenance');
-            case 'BORROWED':
-                return t('statusBorrowed');
             default:
                 return status;
         }
@@ -495,12 +716,9 @@ export default function EquipmentList() {
                 case 'MAINTENANCE':
                     statusCount.MAINTENANCE++;
                     break;
-                case 'BORROWED':
-                    statusCount.BORROWED++;
-                    break;
             }
         });
-        return `${statusCount.ACTIVE}/${statusCount.BROKEN}/${statusCount.MAINTENANCE}/${statusCount.BORROWED}`;
+        return `${statusCount.ACTIVE}/${statusCount.BROKEN}/${statusCount.MAINTENANCE}`;
     };
 
     const handlePageChange = (page) => {
@@ -606,7 +824,6 @@ export default function EquipmentList() {
             ...prev,
             [name]: value,
         }));
-        console.log('Updated selectedEquipmentItem:', { ...selectedEquipmentItem, [name]: value });
     };
     const handleImageChange = (e) => {
         setNewEquipmentData((prev) => ({ ...prev, image: e.target.files[0] }));
@@ -618,7 +835,14 @@ export default function EquipmentList() {
     const handleOpenMaintenanceHistory = (item) => {
         if (!item || !item.id) {
             console.error('Invalid equipment item:', item);
-            alert(t('error') + ': Invalid equipment item');
+            toast.error(t('error') + ': Invalid equipment item', {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             return;
         }
         navigate(`/maintenance-history/${item.id}`, { state: { serialNumber: item.serialNumber } });
@@ -634,6 +858,7 @@ export default function EquipmentList() {
                 >
                     {t('retry')}
                 </button>
+                <ToastContainer />
             </div>
         );
     }
@@ -748,10 +973,6 @@ export default function EquipmentList() {
                                             <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('MAINTENANCE')}`}>
                                                 {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[2] : '0'}
                                             </span>
-                                            {/*<span className="text-gray-500">/</span>*/}
-                                            {/*<span className={`inline-block px-1 text-xs font-medium ${getStatusColor('BORROWED')}`}>*/}
-                                            {/*    {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[3] : '0'}*/}
-                                            {/*</span>*/}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{equipment.categoryName}</td>
@@ -932,6 +1153,7 @@ export default function EquipmentList() {
                 onConfirm={handleDeleteEquipmentItem}
                 serialNumber={equipmentItemToDelete?.serialNumber || ''}
             />
+            <ToastContainer />
         </div>
     );
 }

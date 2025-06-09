@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import {useAuth} from "../../Auth/AuthContext.jsx";
+import { useAuth } from "../../Auth/AuthContext.jsx";
 
-export default function AddMaintenance({ isOpen, onClose, onSave, newMaintenance, onInputChange, maintenanceData }) {
+export default function AddMaintenance({ isOpen, onClose, onSave, newMaintenance, onInputChange}) {
     const { t } = useTranslation();
-    const {fetchWithAuth} = useAuth();
+    const { fetchWithAuth } = useAuth();
     const [equipments, setEquipments] = useState([]);
     const [equipmentItems, setEquipmentItems] = useState([]);
     const [selectedEquipmentId, setSelectedEquipmentId] = useState('');
@@ -36,7 +36,9 @@ export default function AddMaintenance({ isOpen, onClose, onSave, newMaintenance
             });
             if (!response.ok) throw new Error(t('fetchError'));
             const data = await response.json();
-            setEquipmentItems(data || []);
+            // Lọc chỉ các equipment items có trạng thái ACTIVE
+            const activeItems = data.filter(item => item.status === 'ACTIVE') || [];
+            setEquipmentItems(activeItems);
         } catch (err) {
             console.error('Failed to fetch equipment items:', err);
             setEquipmentItems([]);
@@ -64,25 +66,25 @@ export default function AddMaintenance({ isOpen, onClose, onSave, newMaintenance
         onInputChange({ target: { name: 'equipmentItemId', value: '' } });
     };
 
-    const handleEquipmentItemChange = (e) => {
-        const equipmentItemId = e.target.value;
-        const selectedItem = equipmentItems.find((item) => item.id === parseInt(equipmentItemId));
-        if (selectedItem) {
-            const serialNumber = selectedItem.serialNumber;
-            const existingMaintenance = maintenanceData.find((m) => m.serialNumber === serialNumber);
-            if (existingMaintenance) {
-                if (existingMaintenance.status === 'IN_PROGRESS') {
-                    setWarningMessage('This equipment item is currently under maintenance.');
-                } else {
-                    setWarningMessage('This serial number already exists, please choose another one.');
-                }
-                onInputChange({ target: { name: 'equipmentItemId', value: '' } });
-            } else {
-                setWarningMessage('');
-                onInputChange(e);
-            }
-        }
-    };
+    // const handleEquipmentItemChange = (e) => {
+    //     // const equipmentItemId = e.target.value;
+    //     // const selectedItem = equipmentItems.find((item) => item.id === parseInt(equipmentItemId));
+    //     // if (selectedItem) {
+    //     //     const serialNumber = selectedItem.serialNumber;
+    //     //     const existingMaintenance = maintenanceData.find((m) => m.serialNumber === serialNumber);
+    //     //     if (existingMaintenance) {
+    //     //         if (existingMaintenance.status === 'IN_PROGRESS') {
+    //     //             setWarningMessage('This equipment item is currently under maintenance.');
+    //     //         } else {
+    //     //             setWarningMessage('This serial number already exists, please choose another one.');
+    //     //         }
+    //     //         onInputChange({ target: { name: 'equipmentItemId', value: '' } });
+    //     //     } else {
+    //     //         setWarningMessage('');
+    //     //         onInputChange(e);
+    //     //     }
+    //     // }
+    // };
 
     if (!isOpen) return null;
 
@@ -112,7 +114,7 @@ export default function AddMaintenance({ isOpen, onClose, onSave, newMaintenance
                     <select
                         name="equipmentItemId"
                         value={newMaintenance.equipmentItemId || ''}
-                        onChange={handleEquipmentItemChange}
+                        onChange={onInputChange}
                         className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
                         required
                         disabled={!selectedEquipmentId}

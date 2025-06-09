@@ -11,7 +11,6 @@ export default function EditUser({ isOpen, onClose, onSave, user, onInputChange 
 
     return (
         <>
-            {/* Modal content */}
             <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/30">
                 <div className="bg-white rounded-lg shadow-xl w-96 max-w-[90%] p-6 pointer-events-auto">
                     <h2 className="text-xl font-bold text-gray-900 mb-4">{t('editUser')}</h2>

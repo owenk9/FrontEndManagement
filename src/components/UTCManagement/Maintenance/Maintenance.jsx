@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import SearchBar from '../Nav/SearchBar.jsx';
 import { Pencil, Trash2, Plus } from 'lucide-react';
 import AddMaintenance from './AddMaintenance.jsx';
@@ -6,7 +8,7 @@ import EditMaintenance from './EditMaintenance.jsx';
 import DeleteMaintenance from './DeleteMaintenance.jsx';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
-import { useAuth } from "../../Auth/AuthContext.jsx";
+import { useAuth } from '../../Auth/AuthContext.jsx';
 import debounce from 'lodash.debounce';
 
 export default function Maintenance() {
@@ -28,12 +30,12 @@ export default function Maintenance() {
     });
     const [selectedMaintenance, setSelectedMaintenance] = useState(null);
     const [maintenanceToDelete, setMaintenanceToDelete] = useState(null);
-    const [loading, setLoading] = useState(false); // Aligned with BorrowTable's initial loading state
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
     const [pageSize] = useState(10);
-    const [searchQuery, setSearchQuery] = useState(''); // Changed to searchQuery to match BorrowTable
+    const [searchQuery, setSearchQuery] = useState('');
 
     const BASE_URL = 'http://localhost:9090';
 
@@ -55,7 +57,6 @@ export default function Maintenance() {
                 url = `${BASE_URL}/maintenance/search?page=${page}&size=${pageSize}&name=${encodeURIComponent(searchQuery)}`;
             }
 
-            console.log('Fetching maintenance data with URL:', url);
             const response = await fetchWithAuth(url, {
                 method: 'GET',
                 headers: {
@@ -89,14 +90,12 @@ export default function Maintenance() {
                 return map;
             }, {}) : {};
 
-            const enrichedMaintenance = maintenanceList.map(maintenance => {
-                const equipmentItem = itemsMap[maintenance.equipmentItemId] || {};
-                return {
-                    ...maintenance,
-                    equipmentName: equipmentItem.equipmentName || 'N/A',
-                    serialNumber: equipmentItem.serialNumber || 'N/A',
-                };
-            });
+            const enrichedMaintenance = maintenanceList.map(maintenance => ({
+                ...maintenance,
+                equipmentName: itemsMap[maintenance.equipmentItemId]?.equipmentName || 'N/A',
+                serialNumber: itemsMap[maintenance.equipmentItemId]?.serialNumber || 'N/A',
+                itemStatus: itemsMap[maintenance.equipmentItemId]?.status || 'N/A',
+            }));
 
             setMaintenanceData(enrichedMaintenance);
             setTotalPages(data.page.totalPages || 1);
@@ -105,6 +104,14 @@ export default function Maintenance() {
             setError(err.message);
             setMaintenanceData([]);
             setTotalPages(1);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         } finally {
             setLoading(false);
         }
@@ -125,6 +132,14 @@ export default function Maintenance() {
         } catch (err) {
             console.error('Failed to fetch equipment items:', err);
             setError(err.message);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         }
     };
 
@@ -138,7 +153,7 @@ export default function Maintenance() {
 
     const handleSearch = (query) => {
         setSearchQuery(query);
-        setCurrentPage(0); // Reset to first page on new search
+        setCurrentPage(0);
     };
 
     useEffect(() => {
@@ -149,9 +164,9 @@ export default function Maintenance() {
     }, [searchQuery, debouncedFetchMaintenanceData]);
 
     useEffect(() => {
-        if (currentPage !== 0) {
+
             debouncedFetchMaintenanceData(currentPage);
-        }
+
         return () => debouncedFetchMaintenanceData.cancel();
     }, [currentPage, debouncedFetchMaintenanceData]);
 
@@ -160,6 +175,40 @@ export default function Maintenance() {
     }, [fetchWithAuth]);
 
     const handleAddMaintenance = async () => {
+        // if (!newMaintenanceData.equipmentItemId) {
+        //     toast.error('Add fail. Please select a equipment item', {
+        //         position: "top-right",
+        //         autoClose: 5000,
+        //         hideProgressBar: false,
+        //         closeOnClick: true,
+        //         pauseOnHover: true,
+        //         draggable: true,
+        //     });
+        //     return;
+        // }
+        const selectedEquipmentItem = equipmentItems.find(item => item.id === parseInt(newMaintenanceData.equipmentItemId));
+        if (!selectedEquipmentItem || !selectedEquipmentItem.equipmentName) {
+            toast.error('Add fail. Please select a equipment name and equipment item', {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
+            return;
+        }
+        if (!newMaintenanceData.maintenanceDate  || !selectedMaintenance.technician) {
+            toast.error(t('fillRequiredMaintenanceFields'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
+            return;
+        }
         try {
             const response = await fetchWithAuth(`${BASE_URL}/maintenance/add`, {
                 method: 'POST',
@@ -177,6 +226,14 @@ export default function Maintenance() {
                 const errorText = await response.text();
                 throw new Error(t('addError') + ': ' + errorText);
             }
+            toast.success(t('maintenanceAddedSuccessfully'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             setNewMaintenanceData({
                 equipmentItemId: '',
                 maintenanceDate: '',
@@ -186,15 +243,30 @@ export default function Maintenance() {
                 technician: '',
             });
             setIsAddModalOpen(false);
-            fetchMaintenanceData(currentPage);
+            await fetchMaintenanceData(currentPage);
         } catch (err) {
-            alert(err.message);
+            console.error('Failed to add maintenance:', err);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         }
     };
 
     const handleEditMaintenance = async () => {
         if (!selectedMaintenance.equipmentItemId || !selectedMaintenance.maintenanceDate || !selectedMaintenance.cost || !selectedMaintenance.technician) {
-            alert(t('fillRequiredMaintenanceFields'));
+            toast.error(t('fillRequiredMaintenanceFields'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             return;
         }
         try {
@@ -214,11 +286,30 @@ export default function Maintenance() {
                 const errorText = await response.text();
                 throw new Error(t('updateError') + ': ' + errorText);
             }
-            setIsEditModalOpen(false);
+            toast.success(t('maintenanceUpdatedSuccessfully'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
+
+
             setSelectedMaintenance(null);
-            fetchMaintenanceData(currentPage);
+            setIsEditModalOpen(false);
+
+            await fetchMaintenanceData(currentPage);
         } catch (err) {
-            alert(err.message);
+            console.error('Failed to update maintenance:', err);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         }
     };
 
@@ -232,11 +323,27 @@ export default function Maintenance() {
                 const errorText = await response.text();
                 throw new Error(t('deleteError') + ': ' + errorText);
             }
+            toast.success(t('maintenanceDeletedSuccessfully'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             setIsDeleteModalOpen(false);
             setMaintenanceToDelete(null);
-            fetchMaintenanceData(currentPage);
+            await fetchMaintenanceData(currentPage);
         } catch (err) {
-            alert(err.message);
+            console.error('Failed to delete maintenance:', err);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         }
     };
 
@@ -312,6 +419,7 @@ export default function Maintenance() {
             ...maintenance,
             equipmentItemId: maintenance.equipmentItemId,
             equipmentName: equipmentItem?.equipmentName || 'N/A',
+            serialNumber: equipmentItem?.serialNumber || 'N/A',
         });
         setIsEditModalOpen(true);
     };
@@ -337,6 +445,7 @@ export default function Maintenance() {
             >
                 {t('retry')}
             </button>
+            <ToastContainer />
         </div>
     );
 
@@ -475,6 +584,7 @@ export default function Maintenance() {
                 onConfirm={handleDeleteMaintenance}
                 equipmentItemName={maintenanceToDelete?.serialNumber || ''}
             />
+            <ToastContainer />
         </div>
     );
 }

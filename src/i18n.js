@@ -270,6 +270,50 @@ i18n
                     noMaintenanceData: "No maintenance found",
                     noCategories: "No category found",
                     noEquipmentFound: 'No equipment found',
+
+                    addEquipmentItem: 'Add equipment item',
+                    enterSerialNumber: 'Enter serial number',
+
+                    equipmentNameAlreadyExists: "The equipment name already exists. Please choose a different name.",
+                    serialNumberAlreadyExists: "The serial number already exists. Please choose a different serial number.",
+                    equipmentAddedSuccessfully: "Equipment added successfully!",
+                    equipmentItemAddedSuccessfully: "Equipment item added successfully!",
+                    equipmentUpdatedSuccessfully: "Equipment updated successfully!",
+                    equipmentItemUpdatedSuccessfully: "Equipment item updated successfully!",
+                    equipmentDeletedSuccessfully: "Equipment deleted successfully!",
+                    equipmentItemDeletedSuccessfully: "Equipment item deleted successfully!",
+                    equipmentNameRequired: "Equipment name is required.",
+                    fetchError: "Failed to fetch data. Please try again.",
+                    addError: "Failed to add equipment.",
+                    addItemError: "Failed to add equipment item.",
+                    updateError: "Failed to update equipment.",
+                    updateItemError: "Failed to update equipment item.",
+                    deleteError: "Failed to delete equipment.",
+                    deleteItemError: "Failed to delete equipment item.",
+
+                    categoryAddedSuccessfully: "Category added successfully",
+                    categoryUpdatedSuccessfully: "Category updated successfully",
+                    categoryDeletedSuccessfully: "Category deleted successfully",
+
+
+                    locationAddedSuccessfully: "Location added successfully!",
+                    locationUpdatedSuccessfully: "Location updated successfully!",
+                    locationDeletedSuccessfully: "Location deleted successfully!",
+
+                    maintenanceUpdatedSuccessfully: "Maintenance updated successfully",
+                    maintenanceAddedSuccessfully: "Maintenance added successfully",
+                    maintenanceDeletedSuccessfully: "Maintenance deleted successfully",
+
+                    userAddedSuccessfully: "User added successfully",
+                    userUpdatedSuccessfully: "User updated successfully",
+                    userDeletedSuccessfully: "User deleted successfully",
+
+                    submitReport: "Submit report",
+                    reportBrokenSuccess: "Report broken successfully",
+                    brokenDate: "Broken date",
+                    reportBroken: "Report broken",
+
+                    emailNotFound: "Email not found"
                 },
             },
             vi: {
@@ -351,9 +395,9 @@ i18n
                     //  Location
                     locations: 'Vị trí',
                     locationName: 'Tên vị trí',
-                    equipment: 'Thiết bị', // Số lượng thiết bị ở bảng chính
-                    addEquipmentToLocation: 'Thêm thiết bị vào vị trí', // Tiêu đề modal
-                    fillRequiredEquipmentFieldsForLocation: 'Vui lòng điền đầy đủ các trường bắt buộc: Mã, Tên', // Thông báo lỗi
+                    equipment: 'Thiết bị',
+                    addEquipmentToLocation: 'Thêm thiết bị vào vị trí',
+                    fillRequiredEquipmentFieldsForLocation: 'Vui lòng điền đầy đủ các trường bắt buộc: Mã, Tên',
 
                     // NavBar
                     home: 'Trang chủ',

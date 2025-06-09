@@ -130,9 +130,9 @@ export default function BrokenReports() {
     }, [searchQuery, debouncedFetchBrokenReports]);
 
     useEffect(() => {
-        if (currentPage !== 0) {
+
             debouncedFetchBrokenReports(currentPage);
-        }
+
         return () => debouncedFetchBrokenReports.cancel();
     }, [currentPage, debouncedFetchBrokenReports]);
 

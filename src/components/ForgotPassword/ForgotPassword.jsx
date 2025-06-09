@@ -1,20 +1,18 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../Auth/AuthContext.jsx';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function ForgotPassword() {
     const { t } = useTranslation();
     const [email, setEmail] = useState('');
-    const [message, setMessage] = useState('');
-    const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
     const BASE_URL = 'http://localhost:9090';
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setMessage('');
-        setError('');
         setLoading(true);
 
         try {
@@ -26,14 +24,28 @@ export default function ForgotPassword() {
             if (!response.ok) {
                 const errorText = await response.text();
                 if (response.status === 404 || errorText.toLowerCase().includes('not found')) {
-                    throw new Error('Email not found');
+                    throw new Error(t('emailNotFound'));
                 }
                 throw new Error(errorText || t('forgotPasswordError'));
             }
 
-            setMessage(t('resetPasswordLinkSent'));
+            toast.success(t('resetPasswordLinkSent'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         } catch (err) {
-            setError(err.message); // Hiển thị "Email not found" nếu khớp điều kiện
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         } finally {
             setLoading(false);
         }
@@ -58,8 +70,6 @@ export default function ForgotPassword() {
                             required
                         />
                     </div>
-                    {message && <p className="text-green-600 mb-4">{message}</p>} {/* Thay đổi màu xanh cho thông báo thành công */}
-                    {error && <p className="text-red-600 mb-4">{error}</p>} {/* Giữ màu đỏ cho lỗi */}
                     <button
                         type="submit"
                         className="w-full bg-black text-white p-3 rounded-md hover:bg-gray-800 transition-colors"
@@ -74,6 +84,7 @@ export default function ForgotPassword() {
                     </a>
                 </p>
             </div>
+            <ToastContainer />
         </div>
     );
 }

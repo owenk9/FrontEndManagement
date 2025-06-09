@@ -143,12 +143,14 @@ export default function ReportsDashboard() {
     const handleMaintenancePageChange = (page) => {
         if (page >= 0 && page < maintenanceTotalPages && page !== maintenancePage) {
             setMaintenancePage(page);
+            fetchMaintenanceReports();
         }
     };
 
     const handleBrokenPageChange = (page) => {
         if (page >= 0 && page < brokenTotalPages && page !== brokenPage) {
             setBrokenPage(page);
+            fetchBrokenReports();
         }
     };
 
@@ -248,9 +250,8 @@ export default function ReportsDashboard() {
         }
     };
 
-    // Hàm xác định màu sắc trạng thái
     const getStatusColor = (status) => {
-        switch (status?.toUpperCase()) { // Dùng toUpperCase để khớp với PENDING, IN_PROGRESS, RESOLVED
+        switch (status?.toUpperCase()) {
             case 'PENDING':
                 return 'bg-yellow-100 text-yellow-700 border-yellow-200';
             case 'IN_PROGRESS':
@@ -262,9 +263,8 @@ export default function ReportsDashboard() {
         }
     };
 
-    // Hàm dịch trạng thái
     const getTranslatedStatus = (status) => {
-        switch (status?.toUpperCase()) { // Dùng toUpperCase để khớp với PENDING, IN_PROGRESS, RESOLVED
+        switch (status?.toUpperCase()) {
             case 'PENDING':
                 return t('statusPending');
             case 'IN_PROGRESS':
@@ -374,6 +374,7 @@ export default function ReportsDashboard() {
                         <tr>
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">{t('id')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">{t('equipmentName')}</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">{t('serialNumber')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">{t('maintenanceDate')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">{t('description')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">{t('technician')}</th>
@@ -386,6 +387,7 @@ export default function ReportsDashboard() {
                                 <tr key={report.id} className="border-t border-gray-200 hover:bg-gray-50">
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">{report.id}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">{report.equipmentName}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm">{report.serialNumber || 'N/A'}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">{formatDateTime(report.maintenanceDate)}</td>
                                     <td className="px-6 py-4 text-sm">{report.description}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">{report.technician}</td>
@@ -394,7 +396,7 @@ export default function ReportsDashboard() {
                             ))
                         ) : (
                             <tr>
-                                <td colSpan="6" className="py-4 text-center text-gray-600">
+                                <td colSpan="7" className="py-4 text-center text-gray-600">
                                     {t('noMaintenanceStatistics')}
                                 </td>
                             </tr>
@@ -405,7 +407,7 @@ export default function ReportsDashboard() {
                         <div className="flex gap-2">
                             <button
                                 className={`px-3 py-1 rounded-md ${
-                                    maintenancePage === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-blue-700'
+                                    maintenancePage === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-700'
                                 }`}
                                 onClick={() => handleMaintenancePageChange(maintenancePage - 1)}
                                 disabled={maintenancePage === 0 || loading}
@@ -415,7 +417,7 @@ export default function ReportsDashboard() {
                             {renderMaintenancePageNumbers()}
                             <button
                                 className={`px-3 py-1 rounded-md ${
-                                    maintenancePage === maintenanceTotalPages - 1 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-blue-700'
+                                    maintenancePage === maintenanceTotalPages - 1 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-700'
                                 }`}
                                 onClick={() => handleMaintenancePageChange(maintenancePage + 1)}
                                 disabled={maintenancePage === maintenanceTotalPages - 1 || loading}

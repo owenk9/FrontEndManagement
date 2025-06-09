@@ -62,30 +62,30 @@ export default function EditMaintenance({ isOpen, onClose, onSave, maintenance, 
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/30">
             <div className="bg-white rounded-lg shadow-xl w-96 max-w-[90%] p-6 pointer-events-auto">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">{t('editMaintenance')}</h2>
-                <div className="mb-4">
-                    <label className="block text-gray-700 font-semibold mb-1">{t('serialNumber')}</label>
-                    <select
-                        name="serialNumber"
-                        value={formData.serialNumber}
-                        onChange={handleChange}
-                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
-                        required
-                    >
-                        <option value="">{t('selectSerialNumber')}</option>
-                        {uniqueSerialNumbers.length > 0 ? (
-                            uniqueSerialNumbers.map((serial) => (
-                                <option key={serial} value={serial}>
-                                    {serial}
-                                </option>
-                            ))
-                        ) : (
-                            <option value="" disabled>No serial numbers available</option>
-                        )}
-                    </select>
-                    {warningMessage && (
-                        <p className="text-red-500 text-sm mt-1">{warningMessage}</p>
-                    )}
-                </div>
+                {/*<div className="mb-4">*/}
+                {/*    <label className="block text-gray-700 font-semibold mb-1">{t('serialNumber')}</label>*/}
+                {/*    <select*/}
+                {/*        name="serialNumber"*/}
+                {/*        value={formData.serialNumber}*/}
+                {/*        onChange={handleChange}*/}
+                {/*        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"*/}
+                {/*        required*/}
+                {/*    >*/}
+                {/*        <option value="">{t('selectSerialNumber')}</option>*/}
+                {/*        {uniqueSerialNumbers.length > 0 ? (*/}
+                {/*            uniqueSerialNumbers.map((serial) => (*/}
+                {/*                <option key={serial} value={serial}>*/}
+                {/*                    {serial}*/}
+                {/*                </option>*/}
+                {/*            ))*/}
+                {/*        ) : (*/}
+                {/*            <option value="" disabled>No serial numbers available</option>*/}
+                {/*        )}*/}
+                {/*    </select>*/}
+                {/*    {warningMessage && (*/}
+                {/*        <p className="text-red-500 text-sm mt-1">{warningMessage}</p>*/}
+                {/*    )}*/}
+                {/*</div>*/}
                 <div className="mb-4">
                     <label className="block text-gray-700 font-semibold mb-1">{t('maintenanceDate')}</label>
                     <input

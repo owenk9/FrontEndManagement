@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import SearchBar from '../Nav/SearchBar.jsx';
 import AddCategoryModal from './AddCategory.jsx';
 import EditCategory from './EditCategory.jsx';
@@ -27,11 +29,11 @@ export default function Category() {
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
     const [pageSize] = useState(10);
-    const [searchTerm, setSearchTerm] = useState(''); // Đổi từ const thành state để phản ánh từ khóa
+    const [searchTerm, setSearchTerm] = useState('');
 
     const BASE_URL = 'http://localhost:9090';
 
-    const fetchCategoryData = useCallback(async (page = 0, search = '') => {
+    const fetchCategoryDataDirect = useCallback(async (page = 0, search = '') => {
         try {
             setLoading(true);
             const url = search && search.trim() !== ''
@@ -57,38 +59,44 @@ export default function Category() {
             setError(err.message);
             setCategoryData([]);
             setTotalPages(1);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         } finally {
             setLoading(false);
         }
     }, [fetchWithAuth, pageSize, t]);
 
     const debouncedFetchCategoryData = useCallback(
-        debounce((page, search) => {
-            console.log('Debounced fetch triggered for page:', page, 'with searchTerm:', search);
-            fetchCategoryData(page, search);
+        debounce((search) => {
+            setCurrentPage(0);
+            fetchCategoryDataDirect(0, search);
         }, 200),
-        [fetchCategoryData]
+        [fetchCategoryDataDirect]
     );
 
     const handleSearch = useCallback((term) => {
         console.log('Search term updated:', term);
         setSearchTerm(term);
-        setCurrentPage(0); // Reset to first page on new search
+        debouncedFetchCategoryData(term);
+    }, [debouncedFetchCategoryData]);
+
+    useEffect(() => {
+        fetchCategoryDataDirect(0);
     }, []);
 
-    useEffect(() => {
-        setLoading(true);
-        setCurrentPage(0);
-        debouncedFetchCategoryData(0, searchTerm);
-        return () => debouncedFetchCategoryData.cancel();
-    }, [searchTerm, debouncedFetchCategoryData]);
-
-    useEffect(() => {
-        if (currentPage !== 0) {
-            debouncedFetchCategoryData(currentPage, searchTerm);
+    const handlePageChange = (page) => {
+        if (page >= 0 && page < totalPages && page !== currentPage) {
+            setLoading(true);
+            setCurrentPage(page);
+            fetchCategoryDataDirect(page, searchTerm);
         }
-        return () => debouncedFetchCategoryData.cancel();
-    }, [currentPage, debouncedFetchCategoryData]);
+    };
 
     const handleOpenAddModal = () => {
         setIsAddModalOpen(true);
@@ -96,7 +104,14 @@ export default function Category() {
 
     const handleAddCategory = async () => {
         if (!newCategoryData.categoryName) {
-            alert(t('fillRequiredFields'));
+            toast.error("Add fail. Please fill category name",{
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             return;
         }
         try {
@@ -107,13 +122,32 @@ export default function Category() {
             });
             if (!response.ok) {
                 const errorText = await response.text();
+                if (response.status === 409 && errorText.includes('already exists')) {
+                    throw new Error(`Add fail. Category with name ${newCategoryData.categoryName} already exists`);
+                }
                 throw new Error(t('addError') + ': ' + errorText);
             }
+            toast.success(t('categoryAddedSuccessfully'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             setNewCategoryData({ categoryName: '', description: '' });
             setIsAddModalOpen(false);
-            fetchCategoryData(currentPage, searchTerm);
+            await fetchCategoryDataDirect(currentPage, searchTerm);
         } catch (err) {
-            alert(err.message);
+            console.error('Failed to add category:', err);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         }
     };
 
@@ -123,10 +157,6 @@ export default function Category() {
     };
 
     const handleEditCategory = async () => {
-        if (!selectedCategory.categoryName) {
-            alert(t('fillRequiredFields'));
-            return;
-        }
         try {
             const response = await fetchWithAuth(`${BASE_URL}/category/update/${selectedCategory.id}`, {
                 method: 'PATCH',
@@ -138,13 +168,32 @@ export default function Category() {
             });
             if (!response.ok) {
                 const errorText = await response.text();
-                throw new Error(t('updateError') + ': ' + errorText);
+                if (response.status === 409 && errorText.includes('already exists')) {
+                    throw new Error(`Update fail. Category with name ${newCategoryData.categoryName} already exists`);
+                }
+                throw new Error(t('addError') + ': ' + errorText);
             }
+            toast.success(t('categoryUpdatedSuccessfully'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             setIsEditModalOpen(false);
             setSelectedCategory(null);
-            fetchCategoryData(currentPage, searchTerm);
+            await fetchCategoryDataDirect(currentPage, searchTerm);
         } catch (err) {
-            alert(err.message);
+            console.error('Failed to update category:', err);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         }
     };
 
@@ -163,11 +212,27 @@ export default function Category() {
                 const errorText = await response.text();
                 throw new Error(t('deleteError') + ': ' + errorText);
             }
+            toast.success(t('categoryDeletedSuccessfully'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             setIsDeleteModalOpen(false);
             setCategoryToDelete(null);
-            fetchCategoryData(currentPage, searchTerm);
+            await fetchCategoryDataDirect(currentPage, searchTerm);
         } catch (err) {
-            alert(err.message);
+            console.error('Failed to delete category:', err);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         }
     };
 
@@ -179,13 +244,6 @@ export default function Category() {
     const handleEditInputChange = (e) => {
         const { name, value } = e.target;
         setSelectedCategory((prev) => ({ ...prev, [name]: value }));
-    };
-
-    const handlePageChange = (page) => {
-        if (page >= 0 && page < totalPages && page !== currentPage) {
-            setLoading(true);
-            setCurrentPage(page);
-        }
     };
 
     const renderPageNumbers = () => {
@@ -213,14 +271,19 @@ export default function Category() {
                 </button>
             );
         }
-
         return pageNumbers;
     };
-
 
     if (error) return (
         <div className="min-h-screen p-6 min-w-full flex items-center justify-center">
             <p className="text-red-600">{t('error')}: {error}</p>
+            <button
+                onClick={() => fetchCategoryDataDirect(0, searchTerm)}
+                className="ml-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+                {t('retry')}
+            </button>
+            <ToastContainer />
         </div>
     );
 
@@ -251,12 +314,12 @@ export default function Category() {
                     </thead>
                     <tbody>
                     {loading ? (
-                            <tr>
-                                <td colSpan="9" className="py-4 text-center text-gray-600">
-                                    {t('loading')}...
-                                </td>
-                            </tr>
-                        ) : categoryData.length > 0 ? (
+                        <tr>
+                            <td colSpan="9" className="py-4 text-center text-gray-600">
+                                {t('loading')}...
+                            </td>
+                        </tr>
+                    ) : categoryData.length > 0 ? (
                         categoryData.map((category) => (
                             <tr key={category.id} className="border-t border-gray-200 hover:bg-gray-50">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{category.id}</td>
@@ -334,6 +397,7 @@ export default function Category() {
                 onConfirm={handleDeleteCategory}
                 categoryName={categoryToDelete?.categoryName || ''}
             />
+            <ToastContainer />
         </div>
     );
 }

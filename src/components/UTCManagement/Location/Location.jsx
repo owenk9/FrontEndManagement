@@ -9,6 +9,8 @@ import { format } from 'date-fns';
 import { useAuth } from "../../Auth/AuthContext.jsx";
 import debounce from 'lodash.debounce';
 import { useNavigate } from 'react-router-dom';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function Location({ searchQuery: propSearchQuery = '', filterParams = {} }) {
     const { t } = useTranslation();
@@ -88,16 +90,24 @@ export default function Location({ searchQuery: propSearchQuery = '', filterPara
 
             setLocationData(locationList);
             setEquipmentCounts(counts);
-            setTotalPages(data.totalPages || 1);
+            setTotalPages(data.page.totalPages || 1);
         } catch (err) {
             console.error('Fetch location error:', err);
             setError(err.message);
             setLocationData([]);
             setTotalPages(1);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         } finally {
             setLoading(false);
         }
-    }, [fetchWithAuth, searchQuery, pageSize, filterParams.filterLocation, t]); // Chỉ phụ thuộc vào filterLocation cụ thể
+    }, [fetchWithAuth, searchQuery, pageSize, filterParams.filterLocation, t]);
 
     const fetchEquipmentItems = useCallback(async (locationId) => {
         try {
@@ -122,6 +132,14 @@ export default function Location({ searchQuery: propSearchQuery = '', filterPara
         } catch (err) {
             console.error(`Failed to fetch equipment items for location ${locationId}:`, err);
             setError(err.message);
+            toast.error(err.message || t('fetchError'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         } finally {
             setItemsLoading((prev) => ({ ...prev, [locationId]: false }));
         }
@@ -147,15 +165,12 @@ export default function Location({ searchQuery: propSearchQuery = '', filterPara
         setCurrentPage(0);
         debouncedFetchLocationData(0);
         return () => debouncedFetchLocationData.cancel();
-    }, [searchQuery, filterParams.filterLocation]); // Loại bỏ debouncedFetchLocationData khỏi phụ thuộc
+    }, [searchQuery, filterParams.filterLocation]);
 
     useEffect(() => {
-        console.log('Second useEffect triggered with currentPage:', currentPage);
-        if (currentPage !== 0) {
             debouncedFetchLocationData(currentPage);
-        }
         return () => debouncedFetchLocationData.cancel();
-    }, [currentPage]); // Loại bỏ debouncedFetchLocationData khỏi phụ thuộc
+    }, [currentPage]);
 
     const handleOpenAddLocationModal = () => {
         setIsAddLocationModalOpen(true);
@@ -163,7 +178,14 @@ export default function Location({ searchQuery: propSearchQuery = '', filterPara
 
     const handleAddLocation = async () => {
         if (!newLocationData.locationName) {
-            alert(t('fillRequiredLocationFields'));
+            toast.error('Add fail. Please fill location name', {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             return;
         }
         try {
@@ -178,12 +200,27 @@ export default function Location({ searchQuery: propSearchQuery = '', filterPara
                 const errorText = await response.text();
                 throw new Error(t('addError') + ': ' + errorText);
             }
+            toast.success(t('locationAddedSuccessfully'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             setNewLocationData({ locationName: '', equipments: '' });
             setIsAddLocationModalOpen(false);
             fetchLocationData(currentPage);
         } catch (err) {
             console.error("Failed to add location", err);
-            alert(err.message);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         }
     };
 
@@ -194,7 +231,14 @@ export default function Location({ searchQuery: propSearchQuery = '', filterPara
 
     const handleEditLocation = async () => {
         if (!selectedLocation.locationName) {
-            alert(t('fillRequiredLocationFields'));
+            toast.error(t('fillRequiredLocationFields'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             return;
         }
         try {
@@ -209,12 +253,27 @@ export default function Location({ searchQuery: propSearchQuery = '', filterPara
                 const errorText = await response.text();
                 throw new Error(t('updateError') + ': ' + errorText);
             }
+            toast.success(t('locationUpdatedSuccessfully'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             setIsEditModalOpen(false);
             setSelectedLocation(null);
             fetchLocationData(currentPage);
         } catch (err) {
             console.error(`Failed to update location:`, err);
-            alert(err.message);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         }
     };
 
@@ -233,12 +292,27 @@ export default function Location({ searchQuery: propSearchQuery = '', filterPara
                 const errorText = await response.text();
                 throw new Error(t('deleteError') + ': ' + errorText);
             }
+            toast.success(t('locationDeletedSuccessfully'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             setIsDeleteModalOpen(false);
             setLocationToDelete(null);
             fetchLocationData(currentPage);
         } catch (err) {
             console.error(`Failed to delete location:`, err);
-            alert(err.message);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         }
     };
 
@@ -356,6 +430,7 @@ export default function Location({ searchQuery: propSearchQuery = '', filterPara
                 >
                     {t('retry')}
                 </button>
+                <ToastContainer />
             </div>
         );
     }
@@ -542,6 +617,7 @@ export default function Location({ searchQuery: propSearchQuery = '', filterPara
                 onConfirm={handleDeleteLocation}
                 locationName={locationToDelete?.locationName || ''}
             />
+            <ToastContainer />
         </div>
     );
 }

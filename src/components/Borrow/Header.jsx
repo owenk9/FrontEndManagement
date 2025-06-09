@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Search, User, LogOut } from 'lucide-react';
 import { Edit, Eye, EyeOff } from 'lucide-react';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function Header({ searchQuery, setSearchQuery, setUserId }) {
     const { t } = useTranslation();
@@ -42,7 +44,15 @@ export default function Header({ searchQuery, setSearchQuery, setUserId }) {
             if (setUserId) setUserId(data.id);
         } catch (err) {
             console.error('Fetch user info error:', err);
-            setError(err.message);
+            setError(null);
+            toast.error(err.message || t('fetchUserInfoFailed'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             if (err.message.includes('401') || err.message.includes('notAuthenticated')) {
                 window.location.href = '/login';
             }
@@ -69,6 +79,14 @@ export default function Header({ searchQuery, setSearchQuery, setUserId }) {
             localStorage.setItem('refreshToken', data.refreshToken || localStorage.getItem('refreshToken'));
         } catch (err) {
             console.error('Refresh token error:', err);
+            toast.error(err.message || t('refreshTokenFailed'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             window.location.href = '/login';
         }
     };
@@ -94,11 +112,27 @@ export default function Header({ searchQuery, setSearchQuery, setUserId }) {
 
     const handleSavePassword = async () => {
         if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
-            setModalError(t('fillAllFields'));
+            setModalError(null);
+            toast.error(t('fillAllFields'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             return;
         }
         if (passwordData.newPassword !== passwordData.confirmPassword) {
-            setModalError(t('passwordMismatch'));
+            setModalError(null);
+            toast.error(t('passwordMismatch'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             return;
         }
 
@@ -118,7 +152,7 @@ export default function Header({ searchQuery, setSearchQuery, setUserId }) {
 
             if (!response.ok) {
                 const data = await response.json();
-                throw new Error(data.accessToken || 'Failed to change password');
+                throw new Error(data.accessToken || t('changePasswordFailed'));
             }
 
             const data = await response.json();
@@ -127,9 +161,24 @@ export default function Header({ searchQuery, setSearchQuery, setUserId }) {
             setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
             setIsChangePasswordModalOpen(false);
             setModalError(null);
-            alert(t('passwordUpdated'));
+            toast.success(t('passwordUpdated'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         } catch (err) {
-            setModalError(err.message || t('changePasswordFailed'));
+            setModalError(null);
+            toast.error(err.message || t('changePasswordFailed'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         }
     };
 
@@ -166,58 +215,54 @@ export default function Header({ searchQuery, setSearchQuery, setUserId }) {
                     <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
                 </div>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center justify-end w-full">
                 {userData && (
-                    <>
-                        <div className="pt-3">
-                        </div>
-                        <div className="relative">
-                            <button
-                                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                                className="flex items-center p-2 rounded-full hover:bg-gray-100 focus:outline-none"
-                            >
-                                {userData.avatarUrl ? (
-                                    <img
-                                        src={userData.avatarUrl}
-                                        alt={userData.fullName || 'User'}
-                                        className="w-8 h-8 rounded-full object-cover"
-                                        onError={(e) => (e.target.src = '/default-avatar.png')}
-                                    />
-                                ) : (
-                                    <User size={24} className="text-gray-600" />
-                                )}
-                            </button>
-
-                            {isUserMenuOpen && (
-                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-50 border border-gray-200">
-                                    <div
-                                        className="p-4 border-b border-gray-200 cursor-pointer"
-                                        onClick={() => {
-                                            setIsPersonalInfoOpen(true);
-                                            setIsUserMenuOpen(false);
-                                        }}
-                                    >
-                                        <p className="text-sm font-semibold text-gray-900">{userData.fullName || 'User'}</p>
-                                        <p className="text-xs text-gray-500">{userData.email || 'user@example.com'}</p>
-                                    </div>
-                                    <button
-                                        onClick={() => setIsChangePasswordModalOpen(true)}
-                                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                    >
-                                        <Edit size={16} className="mr-2" />
-                                        {t('changePassword')}
-                                    </button>
-                                    <button
-                                        onClick={handleLogout}
-                                        className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                    >
-                                        <LogOut size={16} className="mr-2" />
-                                        {t('logout')}
-                                    </button>
-                                </div>
+                    <div className="relative">
+                        <button
+                            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                            className="flex items-center p-2 rounded-full hover:bg-gray-100 focus:outline-none"
+                        >
+                            {userData.avatarUrl ? (
+                                <img
+                                    src={userData.avatarUrl}
+                                    alt={userData.fullName || 'User'}
+                                    className="w-8 h-8 rounded-full object-cover"
+                                    onError={(e) => (e.target.src = '/default-avatar.png')}
+                                />
+                            ) : (
+                                <User size={24} className="text-gray-600" />
                             )}
-                        </div>
-                    </>
+                        </button>
+
+                        {isUserMenuOpen && (
+                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-50 border border-gray-200">
+                                <div
+                                    className="p-4 border-b border-gray-200 cursor-pointer"
+                                    onClick={() => {
+                                        setIsPersonalInfoOpen(true);
+                                        setIsUserMenuOpen(false);
+                                    }}
+                                >
+                                    <p className="text-sm font-semibold text-gray-900">{userData.fullName || 'User'}</p>
+                                    <p className="text-xs text-gray-500">{userData.email || 'user@example.com'}</p>
+                                </div>
+                                <button
+                                    onClick={() => setIsChangePasswordModalOpen(true)}
+                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                >
+                                    <Edit size={16} className="mr-2" />
+                                    {t('changePassword')}
+                                </button>
+                                <button
+                                    onClick={handleLogout}
+                                    className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                >
+                                    <LogOut size={16} className="mr-2" />
+                                    {t('logout')}
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 )}
             </div>
 
@@ -338,6 +383,7 @@ export default function Header({ searchQuery, setSearchQuery, setUserId }) {
                     </div>
                 </div>
             )}
+            <ToastContainer />
         </header>
     );
 }

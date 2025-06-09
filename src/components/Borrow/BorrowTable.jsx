@@ -4,6 +4,8 @@ import { CheckCircle, XCircle, Loader2, AlertCircle, ChevronDown, ChevronUp } fr
 import 'react-loading-skeleton/dist/skeleton.css';
 import debounce from 'lodash.debounce';
 import { useNavigate } from 'react-router-dom';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function BorrowTable({ searchQuery, filterParams, setCategories, setLocations, userId }) {
     const { t } = useTranslation();
@@ -166,11 +168,19 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
 
                 setEquipments(equipmentList);
                 setEquipmentQuantities(quantities);
-                setTotalPages(data.totalPages || 1);
+                setTotalPages(data.page.totalPages || 1);
             }
         } catch (err) {
             console.error('Fetch equipment error:', err);
             setError(err.message);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         } finally {
             setLoading(false);
         }
@@ -224,6 +234,14 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
         } catch (err) {
             console.error('Fetch equipment items error:', err);
             setError(err.message);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         } finally {
             setItemsLoading((prev) => ({ ...prev, [equipmentId]: false }));
         }
@@ -245,9 +263,9 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
     }, [searchQuery, filterParams, debouncedFetchEquipmentData]);
 
     useEffect(() => {
-        if (currentPage !== 0) {
+
             debouncedFetchEquipmentData(currentPage);
-        }
+
         return () => debouncedFetchEquipmentData.cancel();
     }, [currentPage, debouncedFetchEquipmentData]);
 
@@ -330,6 +348,14 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
             } catch (err) {
                 console.error('Fetch initial data error:', err);
                 setError(err.message);
+                toast.error(err.message, {
+                    position: "top-right",
+                    autoClose: 5000,
+                    hideProgressBar: false,
+                    closeOnClick: true,
+                    pauseOnHover: true,
+                    draggable: true,
+                });
             }
         };
 
@@ -358,7 +384,14 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
 
     const handleBrokenReport = async () => {
         if (!selectedEquipmentItemId) {
-            alert(t('selectEquipmentItem'));
+            toast.error(t('selectEquipmentItem'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             return;
         }
         setSubmitting(true);
@@ -412,10 +445,25 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
             }
 
             setIsModalOpen(false);
-            alert(t('reportBrokenSuccess', { name: selectedEquipment.name }));
+            toast.success(t('reportBrokenSuccess', { name: selectedEquipment.name }), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             fetchEquipmentItems(selectedEquipment.id); // Cập nhật danh sách thiết bị
         } catch (err) {
-            alert(err.message);
+            console.error('Report broken error:', err);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         } finally {
             setSubmitting(false);
         }
@@ -423,24 +471,6 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
 
     const isBrokenDateValid = () => {
         return new Date(brokenDetails.brokenDate) <= new Date();
-    };
-
-    const formatReturnDate = (returnDate) => {
-        if (!returnDate) return '-';
-        try {
-            const date = new Date(returnDate);
-            if (isNaN(date.getTime())) return '-';
-            return date.toLocaleString('en-GB', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false,
-            }).replace(',', '');
-        } catch {
-            return '-';
-        }
     };
 
     function getStatusColor(status) {
@@ -504,6 +534,7 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
         if (page >= 0 && page < totalPages && page !== currentPage) {
             setLoading(true);
             setCurrentPage(page);
+            debouncedFetchEquipmentData(page); // Gọi fetch khi thay đổi trang
         }
     };
 
@@ -544,6 +575,7 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
             >
                 {t('retry')}
             </button>
+            <ToastContainer />
         </div>
     );
 
@@ -710,9 +742,6 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                 <div className="fixed inset-0 bg-opacity-50 flex items-center justify-center z-50 bg-black/30">
                     <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md pointer-events-auto">
                         <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('reportBrokenEquipment')}</h2>
-                        {/*<p className="text-gray-600 mb-4">*/}
-                        {/*    {t('reportingEquipment', { name: selectedEquipment?.name })}*/}
-                        {/*</p>*/}
                         <div className="mb-4">
                             <label className="block text-sm font-medium text-gray-700">{t('equipmentItem')}</label>
                             {itemsLoading[selectedEquipment?.id] ? (
@@ -726,7 +755,7 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                                 >
                                     <option value="">{t('selectEquipmentItem')}</option>
                                     {equipmentItems[selectedEquipment?.id]
-                                        .filter((item) => item.status !== 'BROKEN') // Chỉ hiển thị các mục chưa bị hỏng
+                                        .filter((item) => item.status === 'ACTIVE')
                                         .map((item) => (
                                             <option key={`option-${item.id}`} value={item.id}>
                                                 {item.serialNumber} ({getTranslatedStatus(item.status)}, {item.locationName || 'No Location'})
@@ -787,6 +816,7 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                     </div>
                 </div>
             )}
+            <ToastContainer />
         </div>
     );
 }

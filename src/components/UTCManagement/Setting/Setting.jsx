@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Edit, Eye, EyeOff } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function Settings() {
     const { t, i18n } = useTranslation();
@@ -27,11 +29,27 @@ export default function Settings() {
 
     const handleSavePassword = async () => {
         if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
-            setError(t('fillAllFields'));
+            setError(null);
+            toast.error(t('fillAllFields'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             return;
         }
         if (passwordData.newPassword !== passwordData.confirmPassword) {
-            setError(t('passwordMismatch'));
+            setError(null);
+            toast.error(t('passwordMismatch'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
             return;
         }
 
@@ -51,7 +69,7 @@ export default function Settings() {
 
             if (!response.ok) {
                 const data = await response.json();
-                throw new Error(data.accessToken || 'Failed to change password');
+                throw new Error(data.accessToken || t('changePasswordFailed'));
             }
 
             const data = await response.json();
@@ -60,9 +78,24 @@ export default function Settings() {
             setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
             setIsModalOpen(false);
             setError(null);
-            alert(t('passwordUpdated'));
+            toast.success(t('passwordUpdated'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         } catch (err) {
-            setError(err.message || t('changePasswordFailed'));
+            setError(null);
+            toast.error(err.message || t('changePasswordFailed'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         }
     };
 
@@ -202,6 +235,7 @@ export default function Settings() {
                     </div>
                 </div>
             )}
+            <ToastContainer />
         </div>
     );
 }

@@ -7,9 +7,11 @@ import DeleteUser from './DeleteUser.jsx';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../Auth/AuthContext.jsx';
 import debounce from "lodash.debounce";
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function User() {
-    console.log("rerender`")
+    console.log("rerender");
     const { t } = useTranslation();
     const { fetchWithAuth } = useAuth();
 
@@ -36,12 +38,12 @@ export default function User() {
 
     const BASE_URL = 'http://localhost:9090';
 
-    const fetchUserData = useCallback(async (page = 0) => {
+    const fetchUserDataDirect = useCallback(async (page = 0, query = searchQuery) => {
         try {
             setLoading(true);
             let url;
-            if (searchQuery && searchQuery.trim() !== '') {
-                url = `${BASE_URL}/user/search?page=${page}&size=${pageSize}&name=${encodeURIComponent(searchQuery)}`;
+            if (query && query.trim() !== '') {
+                url = `${BASE_URL}/user/search?page=${page}&size=${pageSize}&name=${encodeURIComponent(query)}`;
             } else {
                 url = `${BASE_URL}/user/get?page=${page}&size=${pageSize}`;
             }
@@ -65,38 +67,56 @@ export default function User() {
             setError(err.message);
             setUserData([]);
             setTotalPages(1);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         } finally {
             setLoading(false);
         }
-    }, [fetchWithAuth, pageSize, searchQuery,t]);
+    }, [fetchWithAuth, pageSize, searchQuery, t]);
 
-    const debouncedFetchUserData = useCallback(
-        debounce((page) => {
-            fetchUserData(page);
-        }, 200),
-        [fetchUserData]
+    const debouncedSearch = useCallback(
+        debounce((query) => {
+            setCurrentPage(0);
+            fetchUserDataDirect(0, query);
+        }, 300),
+        [fetchUserDataDirect]
     );
+
     const handleSearch = (query) => {
         setSearchQuery(query);
-        setCurrentPage(0);
+        debouncedSearch(query);
     };
 
     useEffect(() => {
-        setLoading(true);
-        setCurrentPage(0);
-        debouncedFetchUserData(0);
-        return () => debouncedFetchUserData.cancel();
+        fetchUserDataDirect(0); // Load lần đầu
+    }, []); // Chỉ chạy khi mount
 
-    }, [searchQuery, debouncedFetchUserData]);
-
-    useEffect(() => {
-        if (currentPage !== 0) {
-            debouncedFetchUserData(currentPage);
+    const handlePageChange = (page) => {
+        if (page >= 0 && page < totalPages && page !== currentPage) {
+            setLoading(true);
+            setCurrentPage(page);
+            fetchUserDataDirect(page);
         }
-        return () => debouncedFetchUserData.cancel();
-    }, [currentPage, debouncedFetchUserData]);
+    };
 
     const handleAddUser = async () => {
+        if (!newUserData.firstName || !newUserData.lastName || !newUserData.role || !newUserData.email || !newUserData.department || !newUserData.password) {
+            toast.error('Add fail. Please fill first name, last name, role, email, department and password', {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
+            return;
+        }
         try {
             const response = await fetchWithAuth(`${BASE_URL}/user/add`, {
                 method: 'POST',
@@ -109,6 +129,15 @@ export default function User() {
                 throw new Error(t('addError') + ': ' + errorText);
             }
 
+            toast.success(t('userAddedSuccessfully'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
+
             setNewUserData({
                 firstName: '',
                 lastName: '',
@@ -118,10 +147,17 @@ export default function User() {
                 role: 'USER',
             });
             setIsAddModalOpen(false);
-            fetchUserData(currentPage, searchQuery);
+            fetchUserDataDirect(currentPage);
         } catch (err) {
             console.error('Add user error:', err);
-            alert(err.message);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         }
     };
 
@@ -146,12 +182,28 @@ export default function User() {
                 throw new Error(t('updateError') + ': ' + errorText);
             }
 
+            toast.success(t('userUpdatedSuccessfully'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
+
             setIsEditModalOpen(false);
             setSelectedUser(null);
-            fetchUserData(currentPage, searchQuery);
+            fetchUserDataDirect(currentPage);
         } catch (err) {
             console.error('Update user error:', err);
-            alert(err.message);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         }
     };
 
@@ -168,19 +220,28 @@ export default function User() {
                 throw new Error(t('deleteError') + ': ' + errorText);
             }
 
+            toast.success(t('userDeletedSuccessfully'), {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
+
             setIsDeleteModalOpen(false);
             setUserToDelete(null);
-            fetchUserData(currentPage, searchQuery);
+            fetchUserDataDirect(currentPage);
         } catch (err) {
             console.error('Delete user error:', err);
-            alert(err.message);
-        }
-    };
-
-    const handlePageChange = (page) => {
-        if (page >= 0 && page < totalPages && page !== currentPage) {
-            setLoading(true);
-            setCurrentPage(page);
+            toast.error(err.message, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            });
         }
     };
 
@@ -230,12 +291,11 @@ export default function User() {
         setSelectedUser((prev) => ({ ...prev, [name]: value }));
     };
 
-
-
     if (error) {
         return (
             <div className="min-h-screen p-6 min-w-full flex items-center justify-center">
                 <p className="text-red-600">{t('error')}: {error}</p>
+                <ToastContainer />
             </div>
         );
     }
@@ -246,7 +306,7 @@ export default function User() {
                 <h1 className="text-3xl font-bold text-gray-900">{t('user')}</h1>
             </div>
             <div className="mb-6 flex justify-between items-center">
-                <SearchBar onSearch={handleSearch} /> {/* Loại bỏ value, để SearchBar tự quản lý */}
+                <SearchBar onSearch={handleSearch} />
                 <button
                     className="flex items-center gap-2 bg-black text-white py-2 px-4 rounded-md hover:bg-gray-700 transition duration-200"
                     onClick={handleOpenAddModal}
@@ -270,12 +330,12 @@ export default function User() {
                     </thead>
                     <tbody>
                     {loading ? (
-                            <tr>
-                                <td colSpan="9" className="py-4 text-center text-gray-600">
-                                    {t('loading')}...
-                                </td>
-                            </tr>
-                        ) : userData.length > 0 ? (
+                        <tr>
+                            <td colSpan="7" className="py-4 text-center text-gray-600">
+                                {t('loading')}...
+                            </td>
+                        </tr>
+                    ) : userData.length > 0 ? (
                         userData.map((user) => (
                             <tr key={user.id} className="border-t border-gray-200 hover:bg-gray-50">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm">{user.id}</td>
@@ -356,6 +416,7 @@ export default function User() {
                 onConfirm={handleDeleteUser}
                 userName={`${userToDelete?.firstName} ${userToDelete?.lastName}`}
             />
+            <ToastContainer />
         </div>
     );
 }

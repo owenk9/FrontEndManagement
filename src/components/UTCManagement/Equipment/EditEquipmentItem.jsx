@@ -15,7 +15,7 @@ export default function EditEquipmentItem({ isOpen, onClose, onSave, equipmentIt
         setErrors(newErrors);
 
         if (Object.keys(newErrors).length === 0) {
-            console.log('Saving equipment item:', equipmentItem); // Debug dữ liệu trước khi lưu
+            console.log('Saving equipment item:', equipmentItem);
             onSave();
         }
     };
