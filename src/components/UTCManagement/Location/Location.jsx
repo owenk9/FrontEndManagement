@@ -198,7 +198,10 @@ export default function Location({ searchQuery: propSearchQuery = '', filterPara
             });
             if (!response.ok) {
                 const errorText = await response.text();
-                throw new Error(t('addError') + ': ' + errorText);
+                if (response.status === 409 && errorText.includes('already exists')) {
+                    throw new Error(`Update fail. Location with name ${newLocationData.locationName} already exists`);
+                }
+                throw new Error(t('updateError') + ': ' + errorText);
             }
             toast.success(t('locationAddedSuccessfully'), {
                 position: "top-right",
@@ -251,8 +254,12 @@ export default function Location({ searchQuery: propSearchQuery = '', filterPara
             });
             if (!response.ok) {
                 const errorText = await response.text();
+                if (response.status === 500 && errorText.includes('already exists')) {
+                    throw new Error(`Update fail. Location with name ${newLocationData.locationName} already exists`);
+                }
                 throw new Error(t('updateError') + ': ' + errorText);
             }
+
             toast.success(t('locationUpdatedSuccessfully'), {
                 position: "top-right",
                 autoClose: 5000,

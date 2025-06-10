@@ -66,11 +66,10 @@ export default function EditEquipmentItem({ isOpen, onClose, onSave, equipmentIt
                     <label className="block text-gray-700 font-semibold mb-1">{t('location')}</label>
                     <select
                         name="locationId"
-                        value={equipmentItem.locationId || ''}
+                        value={equipmentItem.locationId}
                         onChange={onInputChange}
-                        className={`w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-black ${
-                            errors.locationId ? 'border-red-500' : 'border-gray-300'
-                        }`}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black overflow-y-auto"
+                        size={locations.length > 6 ? 6 : 1}
                     >
                         <option value="">{t('selectLocation')}</option>
                         {locations.map((location) => (
@@ -79,6 +78,7 @@ export default function EditEquipmentItem({ isOpen, onClose, onSave, equipmentIt
                             </option>
                         ))}
                     </select>
+
                 </div>
                 <div className="flex justify-between">
                     <button

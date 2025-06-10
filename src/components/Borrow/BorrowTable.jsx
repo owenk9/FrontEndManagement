@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+
 export default function BorrowTable({ searchQuery, filterParams, setCategories, setLocations, userId }) {
     const { t } = useTranslation();
     const navigate = useNavigate();
@@ -127,7 +128,7 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
 
                         setEquipments(equipmentList);
                         setEquipmentQuantities(quantities);
-                        setTotalPages(data.totalPages || 1);
+                        setTotalPages(data.page.totalPages || 1);
                     } else {
                         throw new Error(t('unauthorized'));
                     }
@@ -263,9 +264,7 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
     }, [searchQuery, filterParams, debouncedFetchEquipmentData]);
 
     useEffect(() => {
-
-            debouncedFetchEquipmentData(currentPage);
-
+        debouncedFetchEquipmentData(currentPage);
         return () => debouncedFetchEquipmentData.cancel();
     }, [currentPage, debouncedFetchEquipmentData]);
 
@@ -406,9 +405,10 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
             const brokenData = {
                 equipmentItemId: parseInt(selectedEquipmentItemId),
                 usersId: userId,
-                brokenDate: brokenDetails.brokenDate + ':00',
+                brokenDate: new Date(brokenDetails.brokenDate + 'Z').toISOString(),
                 description: brokenDetails.description,
             };
+            console.log('Sending broken data:', brokenData); // Debug
             const response = await fetch(`${BASE_URL}/broken/report`, {
                 method: 'POST',
                 headers: {
@@ -453,7 +453,7 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
                 pauseOnHover: true,
                 draggable: true,
             });
-            fetchEquipmentItems(selectedEquipment.id); // Cập nhật danh sách thiết bị
+            fetchEquipmentItems(selectedEquipment.id);
         } catch (err) {
             console.error('Report broken error:', err);
             toast.error(err.message, {
@@ -534,7 +534,7 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
         if (page >= 0 && page < totalPages && page !== currentPage) {
             setLoading(true);
             setCurrentPage(page);
-            debouncedFetchEquipmentData(page); // Gọi fetch khi thay đổi trang
+            debouncedFetchEquipmentData(page);
         }
     };
 

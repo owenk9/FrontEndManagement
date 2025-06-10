@@ -61,13 +61,6 @@ export default function MaintenanceHistoryList() {
         fetchMaintenanceHistory(0, term);
     };
 
-    // const handleFilterChange = (type, value) => {
-    //     if (type === 'technician') {
-    //         setFilterTechnician(value);
-    //         fetchMaintenanceHistory(0, searchTerm, value);
-    //     }
-    // };
-
     const handlePageChange = (page) => {
         if (page >= 0 && page < totalPages && page !== currentPage) {
             setCurrentPage(page);
@@ -140,7 +133,7 @@ export default function MaintenanceHistoryList() {
                 </h1>
             </div>
             <div className="mb-6 flex items-center justify-between">
-                <div className="flex items-center space-x-2">
+                {/*<div className="flex items-center space-x-2">*/}
                     {/*<SearchBar onSearch={handleSearch} />*/}
                     {/*<select*/}
                     {/*    value={filterTechnician}*/}
@@ -152,7 +145,7 @@ export default function MaintenanceHistoryList() {
                     {/*    <option value="Technician A">Technician A</option>*/}
                     {/*    <option value="Technician B">Technician B</option>*/}
                     {/*</select>*/}
-                </div>
+                {/*</div>*/}
             </div>
             <div className="bg-white shadow-md rounded-lg mb-4">
                 <table className="min-w-full table-fixed">

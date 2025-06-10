@@ -26,7 +26,7 @@ export default function NavBar() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const { hasAuthority } = useAuth(); // Sử dụng useAuth để kiểm tra quyền
+    const { hasAuthority } = useAuth();
     const BASE_URL = 'http://localhost:9090';
 
     const fetchUser = async (token) => {
@@ -129,11 +129,9 @@ export default function NavBar() {
                             <NavItem to="/equipments" icon={equipment} label={t('equipment')} />
                             <NavItem to="/category" icon={category} label={t('category')} />
                             <NavItem to="/maintenance" icon={maintenance} label={t('maintenance')} />
-                            {/*<NavItem to="/borrowing" icon={borrowing} label={t('borrowing')} />*/}
                             <NavItem to="/broken" icon={broken} label={t('brokenReport')} />
                             <NavItem to="/location" icon={locations} label={t('location')} />
                             <NavItem to="/statistics" icon={statistics} label={t("statistics")} />
-                            {/* Chỉ hiển thị NavItem "User" nếu là SUPER_ADMIN */}
                             {hasAuthority('ROLE_SUPER_ADMIN') && (
                                 <NavItem to="/user" icon={userIcon} label={t('user')} />
                             )}

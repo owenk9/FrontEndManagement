@@ -313,7 +313,13 @@ i18n
                     brokenDate: "Broken date",
                     reportBroken: "Report broken",
 
-                    emailNotFound: "Email not found"
+                    emailNotFound: "Email not found",
+
+                    delete: 'Delete',
+                    deleteEquipmentItem:  'Delete equipment item',
+                    confirmDeleteItem: 'Delete equipment item',
+
+                    editEquipmentItem:  'Edit equipment item',
                 },
             },
             vi: {

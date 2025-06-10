@@ -14,7 +14,7 @@ export default function Borrow() {
     const [filterStatus, setFilterStatus] = useState('');
     const [categories, setCategories] = useState([]);
     const [locations, setLocations] = useState([]);
-    const [userId, setUserId] = useState(null); // Thêm state userId
+    const [userId, setUserId] = useState(null);
 
     const debouncedSetQuery = useMemo(() => {
         return debounce((value) => {
@@ -38,7 +38,7 @@ export default function Borrow() {
             <Header
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
-                setUserId={setUserId} // Truyền callback để cập nhật userId
+                setUserId={setUserId}
             />
             <div className="flex flex-1 p-6">
                 <SidebarFilter
@@ -67,7 +67,7 @@ export default function Borrow() {
                         filterParams={filterParams}
                         setCategories={setCategories}
                         setLocations={setLocations}
-                        userId={userId} // Truyền userId cho BorrowTable
+                        userId={userId}
                     />
                 ) : (
                     <div className="flex-1 p-6 text-center">

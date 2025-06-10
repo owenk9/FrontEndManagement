@@ -15,7 +15,7 @@ export default function DeleteEquipmentItem({ isOpen, onClose, onConfirm, serial
                 <div className="flex justify-between">
                     <button
                         onClick={onConfirm}
-                        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition duration-200"
+                        className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-700 transition duration-200"
                     >
                         {t('delete')}
                     </button>

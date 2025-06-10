@@ -11,7 +11,6 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 export default function User() {
-    console.log("rerender");
     const { t } = useTranslation();
     const { fetchWithAuth } = useAuth();
 
@@ -126,6 +125,9 @@ export default function User() {
 
             if (!response.ok) {
                 const errorText = await response.text();
+                if (response.status === 500 && errorText.includes('already exists')) {
+                    throw new Error(`Add fail. Email ${newUserData.email} already exists`);
+                }
                 throw new Error(t('addError') + ': ' + errorText);
             }
 
@@ -179,6 +181,9 @@ export default function User() {
 
             if (!response.ok) {
                 const errorText = await response.text();
+                if (response.status === 409 && errorText.includes('already exists')) {
+                    throw new Error(`Update fail. Email ${newUserData.email} already exists`);
+                }
                 throw new Error(t('updateError') + ': ' + errorText);
             }
 

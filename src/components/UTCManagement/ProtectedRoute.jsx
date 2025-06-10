@@ -44,7 +44,7 @@ export default function ProtectedRoute({ children, requiredAuthorities }) {
     }, [user, loading, refreshToken]);
 
     if (loading || checkingToken) {
-        return <div>Loading...</div>; // Don't render child yet
+        return <div>Loading...</div>;
     }
 
     if (!user) {

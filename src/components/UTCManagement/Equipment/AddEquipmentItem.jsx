@@ -3,10 +3,7 @@ import { useTranslation } from 'react-i18next';
 export default function AddEquipmentItem({ isOpen, onClose, onSave, newEquipmentItem, onInputChange, locations, equipmentName }) {
     const { t } = useTranslation();
 
-
     if (!isOpen) return null;
-
-
 
     return (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/30">
@@ -21,7 +18,7 @@ export default function AddEquipmentItem({ isOpen, onClose, onSave, newEquipment
                         name="serialNumber"
                         value={newEquipmentItem.serialNumber}
                         onChange={onInputChange}
-                        className={"w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black" }
+                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
                         placeholder={t('enterSerialNumber')}
                     />
                 </div>
@@ -36,7 +33,6 @@ export default function AddEquipmentItem({ isOpen, onClose, onSave, newEquipment
                         <option value="ACTIVE">{t('statusActive')}</option>
                         <option value="BROKEN">{t('statusBroken')}</option>
                         <option value="MAINTENANCE">{t('statusMaintenance')}</option>
-
                     </select>
                 </div>
                 <div className="mb-4">
@@ -56,7 +52,8 @@ export default function AddEquipmentItem({ isOpen, onClose, onSave, newEquipment
                         name="locationId"
                         value={newEquipmentItem.locationId}
                         onChange={onInputChange}
-                        className={"w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black" }
+                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black overflow-y-auto"
+                        size={locations.length > 6 ? 6 : 1}
                     >
                         <option value="">{t('selectLocation')}</option>
                         {locations.map((location) => (
@@ -65,6 +62,7 @@ export default function AddEquipmentItem({ isOpen, onClose, onSave, newEquipment
                             </option>
                         ))}
                     </select>
+
                 </div>
                 <div className="flex justify-between">
                     <button

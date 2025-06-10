@@ -76,8 +76,8 @@ export default function ReportsDashboard() {
 
             const result = await response.json();
             setBrokenData(result.content || []);
-            setBrokenTotalPages(result.totalPages || 1);
-            setBrokenTotalElements(result.totalElements || 0);
+            setBrokenTotalPages(result.page.totalPages || 1);
+            setBrokenTotalElements(result.page.totalElements || 0);
         } catch (err) {
             console.error('Fetch broken reports error:', err);
             setError(err.message);
@@ -533,7 +533,7 @@ export default function ReportsDashboard() {
                         <div className="flex gap-2">
                             <button
                                 className={`px-3 py-1 rounded-md ${
-                                    brokenPage === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'
+                                    brokenPage === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-700'
                                 }`}
                                 onClick={() => handleBrokenPageChange(brokenPage - 1)}
                                 disabled={brokenPage === 0 || loading}
@@ -543,7 +543,7 @@ export default function ReportsDashboard() {
                             {renderBrokenPageNumbers()}
                             <button
                                 className={`px-3 py-1 rounded-md ${
-                                    brokenPage === brokenTotalPages - 1 ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'
+                                    brokenPage === brokenTotalPages - 1 ? 'bg-gray-300 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-700'
                                 }`}
                                 onClick={() => handleBrokenPageChange(brokenPage + 1)}
                                 disabled={brokenPage === brokenTotalPages - 1 || loading}

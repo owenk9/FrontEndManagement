@@ -34,7 +34,7 @@ export default function Maintenance() {
     const [error, setError] = useState(null);
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
-    const [pageSize] = useState(10);
+    const [pageSize] = useState(7);
     const [searchQuery, setSearchQuery] = useState('');
 
     const BASE_URL = 'http://localhost:9090';
@@ -72,32 +72,7 @@ export default function Maintenance() {
 
             const data = await response.json();
             const maintenanceList = data.content || [];
-
-            const itemResponse = await fetchWithAuth(`${BASE_URL}/item/get?page=0&size=100`, {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
-            });
-
-            if (!itemResponse.ok) {
-                const errorText = await itemResponse.text();
-                throw new Error(`${t('fetchError')}: ${errorText}`);
-            }
-
-            const itemsData = await itemResponse.json();
-            const itemsContent = itemsData.content || itemsData;
-            const itemsMap = Array.isArray(itemsContent) ? itemsContent.reduce((map, item) => {
-                map[item.id] = item;
-                return map;
-            }, {}) : {};
-
-            const enrichedMaintenance = maintenanceList.map(maintenance => ({
-                ...maintenance,
-                equipmentName: itemsMap[maintenance.equipmentItemId]?.equipmentName || 'N/A',
-                serialNumber: itemsMap[maintenance.equipmentItemId]?.serialNumber || 'N/A',
-                itemStatus: itemsMap[maintenance.equipmentItemId]?.status || 'N/A',
-            }));
-
-            setMaintenanceData(enrichedMaintenance);
+            setMaintenanceData(maintenanceList);
             setTotalPages(data.page.totalPages || 1);
         } catch (err) {
             console.error('Fetch maintenance data error:', err);
@@ -119,18 +94,72 @@ export default function Maintenance() {
 
     const fetchEquipmentItems = async () => {
         try {
-            const response = await fetchWithAuth(`${BASE_URL}/item/get?page=0&size=100`, {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
-            });
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`${t('fetchError')}: ${errorText}`);
+            let allEquipmentItems = [];
+            let page = 0;
+            const pageSize = 100;
+            let hasMore = true;
+
+            while (hasMore) {
+                const response = await fetchWithAuth(`${BASE_URL}/item/get?page=${page}&size=${pageSize}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`${t('fetchError')}: ${errorText}`);
+                }
+                const data = await response.json();
+                allEquipmentItems = [...allEquipmentItems, ...(data.content || [])];
+                setEquipmentItems(allEquipmentItems);
+                if (data.page?.totalPages && page + 1 < data.page.totalPages) {
+                    page++;
+                } else {
+                    hasMore = false;
+                }
             }
-            const data = await response.json();
-            setEquipmentItems(data.content || data || []);
+
+
+            let allEquipments = [];
+            page = 0;
+            hasMore = true;
+
+            while (hasMore) {
+                const response = await fetchWithAuth(`${BASE_URL}/equipment/get?page=${page}&size=${pageSize}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`${t('fetchError')}: ${errorText}`);
+                }
+                const data = await response.json();
+                allEquipments = [...allEquipments, ...(data.content || [])];
+                if (data.page?.totalPages && page + 1 < data.page.totalPages) {
+                    page++;
+                } else {
+                    hasMore = false;
+                }
+            }
+
+            const itemsMap = allEquipmentItems.reduce((map, item) => {
+                map[item.id] = item;
+                return map;
+            }, {});
+            const equipmentMap = allEquipments.reduce((map, equipment) => {
+                map[equipment.id] = equipment.equipmentName;
+                return map;
+            }, {});
+
+            const enrichedMaintenance = maintenanceData.map(maintenance => ({
+                ...maintenance,
+                equipmentName: equipmentMap[itemsMap[maintenance.equipmentItemId]?.equipmentId] || 'N/A',
+                serialNumber: itemsMap[maintenance.equipmentItemId]?.serialNumber || 'N/A',
+                itemStatus: itemsMap[maintenance.equipmentItemId]?.status || 'N/A',
+            }));
+
+            setMaintenanceData(enrichedMaintenance);
         } catch (err) {
-            console.error('Failed to fetch equipment items:', err);
+            console.error('Failed to fetch equipment items or equipment:', err);
             setError(err.message);
             toast.error(err.message, {
                 position: "top-right",
@@ -164,9 +193,7 @@ export default function Maintenance() {
     }, [searchQuery, debouncedFetchMaintenanceData]);
 
     useEffect(() => {
-
-            debouncedFetchMaintenanceData(currentPage);
-
+        debouncedFetchMaintenanceData(currentPage);
         return () => debouncedFetchMaintenanceData.cancel();
     }, [currentPage, debouncedFetchMaintenanceData]);
 
@@ -175,20 +202,8 @@ export default function Maintenance() {
     }, [fetchWithAuth]);
 
     const handleAddMaintenance = async () => {
-        // if (!newMaintenanceData.equipmentItemId) {
-        //     toast.error('Add fail. Please select a equipment item', {
-        //         position: "top-right",
-        //         autoClose: 5000,
-        //         hideProgressBar: false,
-        //         closeOnClick: true,
-        //         pauseOnHover: true,
-        //         draggable: true,
-        //     });
-        //     return;
-        // }
-        const selectedEquipmentItem = equipmentItems.find(item => item.id === parseInt(newMaintenanceData.equipmentItemId));
-        if (!selectedEquipmentItem || !selectedEquipmentItem.equipmentName) {
-            toast.error('Add fail. Please select a equipment name and equipment item', {
+        if (!newMaintenanceData.equipmentItemId || !newMaintenanceData.maintenanceDate || !newMaintenanceData.technician || !newMaintenanceData.description) {
+            toast.error('Add fail. Please fill equipment item, maintenance data, technician and description', {
                 position: "top-right",
                 autoClose: 5000,
                 hideProgressBar: false,
@@ -198,25 +213,15 @@ export default function Maintenance() {
             });
             return;
         }
-        if (!newMaintenanceData.maintenanceDate  || !selectedMaintenance.technician) {
-            toast.error(t('fillRequiredMaintenanceFields'), {
-                position: "top-right",
-                autoClose: 5000,
-                hideProgressBar: false,
-                closeOnClick: true,
-                pauseOnHover: true,
-                draggable: true,
-            });
-            return;
-        }
+
         try {
             const response = await fetchWithAuth(`${BASE_URL}/maintenance/add`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     equipmentItemId: parseInt(newMaintenanceData.equipmentItemId),
-                    maintenanceDate: newMaintenanceData.maintenanceDate,
-                    description: newMaintenanceData.description,
+                    maintenanceDate: new Date(newMaintenanceData.maintenanceDate + 'Z').toISOString(),
+                    description: newMaintenanceData.description || '',
                     status: newMaintenanceData.status,
                     cost: parseFloat(newMaintenanceData.cost),
                     technician: newMaintenanceData.technician,
@@ -275,7 +280,7 @@ export default function Maintenance() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     equipmentItemId: parseInt(selectedMaintenance.equipmentItemId),
-                    maintenanceDate: selectedMaintenance.maintenanceDate,
+                    maintenanceDate: new Date(selectedMaintenance.maintenanceDate + 'Z').toISOString(),
                     description: selectedMaintenance.description || '',
                     status: selectedMaintenance.status,
                     cost: parseFloat(selectedMaintenance.cost),
@@ -294,7 +299,6 @@ export default function Maintenance() {
                 pauseOnHover: true,
                 draggable: true,
             });
-
 
             setSelectedMaintenance(null);
             setIsEditModalOpen(false);

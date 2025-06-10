@@ -20,12 +20,12 @@ export default function Borrowing() {
 
     const BASE_URL = 'http://localhost:9090';
 
-    // Hàm làm mới token
+
     const refreshToken = async () => {
         const refreshToken = localStorage.getItem('refreshToken');
         if (!refreshToken) {
             console.error(t('noRefreshToken'));
-            setError(t('noRefreshToken'));
+            // setError(t('noRefreshToken'));
             navigate('/login');
             return false;
         }
@@ -45,19 +45,19 @@ export default function Borrowing() {
             return true;
         } catch (err) {
             console.error('Refresh token error:', err);
-            setError(err.message || t('refreshTokenFailed'));
+            // setError(err.message || t('refreshTokenFailed'));
             navigate('/login');
             return false;
         }
     };
 
-    // Hàm lấy dữ liệu mượn thiết bị
+
     const fetchBorrowingData = async (page = 0, search = '') => {
         try {
             setLoading(true);
             let accessToken = localStorage.getItem('accessToken');
             if (!accessToken) {
-                setError(t('noToken'));
+                // setError(t('noToken'));
                 navigate('/login');
                 return;
             }
@@ -104,7 +104,7 @@ export default function Borrowing() {
             }
         } catch (err) {
             console.error('Fetch borrowing error:', err);
-            setError(err.message);
+            // setError(err.message);
         } finally {
             setLoading(false);
         }
@@ -389,7 +389,7 @@ export default function Borrowing() {
                     )}
                     </tbody>
                 </table>
-                {/* Phân trang nằm trong bảng, căn phải */}
+
                 <div className="flex justify-end items-center p-4">
                     <div className="flex gap-2">
                         <button

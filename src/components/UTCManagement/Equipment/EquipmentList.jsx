@@ -22,7 +22,6 @@ export default function EquipmentList() {
     const [equipmentData, setEquipmentData] = useState([]);
     const [locations, setLocations] = useState([]);
     const [categories, setCategories] = useState([]);
-    const [equipmentQuantities, setEquipmentQuantities] = useState({});
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -53,7 +52,7 @@ export default function EquipmentList() {
     const [error, setError] = useState(null);
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
-    const [pageSize] = useState(10);
+    const [pageSize] = useState(7);
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedEquipmentId, setExpandedEquipmentId] = useState(null);
     const [equipmentItems, setEquipmentItems] = useState({});
@@ -82,29 +81,7 @@ export default function EquipmentList() {
             }
             const data = await response.json();
             const equipmentList = data.content || [];
-            const quantities = {};
-            await Promise.all(
-                equipmentList.map(async (equipment) => {
-                    try {
-                        const itemResponse = await fetchWithAuth(`${BASE_URL}/item/get?equipmentId=${equipment.id}`, {
-                            method: 'GET',
-                            headers: { 'Content-Type': 'application/json' },
-                        });
-                        if (!itemResponse.ok) {
-                            console.error(`Failed to fetch items for equipment ${equipment.id}`);
-                            quantities[equipment.id] = 0;
-                            return;
-                        }
-                        const items = await itemResponse.json();
-                        quantities[equipment.id] = items.length;
-                    } catch (err) {
-                        console.error(`Error fetching items for equipment ${equipment.id}:`, err);
-                        quantities[equipment.id] = 0;
-                    }
-                })
-            );
             setEquipmentData(equipmentList);
-            setEquipmentQuantities(quantities);
             setTotalPages(data.page?.totalPages || 1);
         } catch (err) {
             console.error('Fetch equipment data error:', err);
@@ -131,7 +108,11 @@ export default function EquipmentList() {
         }
         try {
             setItemsLoading((prev) => ({ ...prev, [equipmentId]: true }));
-            const response = await fetchWithAuth(`${BASE_URL}/item/get?equipmentId=${equipmentId}`, {
+            let url = `${BASE_URL}/item/get?equipmentId=${equipmentId}`;
+            if (filterLocationId) url += `&locationId=${filterLocationId}`;
+            if (filterCategoryId) url += `&categoryId=${filterCategoryId}`;
+
+            const response = await fetchWithAuth(url, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
@@ -170,13 +151,26 @@ export default function EquipmentList() {
 
     const fetchCategories = async () => {
         try {
-            const response = await fetchWithAuth(`${BASE_URL}/category/get?page=0&size=100`, {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
-            });
-            if (!response.ok) throw new Error(t('fetchError'));
-            const data = await response.json();
-            setCategories(data.content || []);
+            let allCategories = [];
+            let page = 0;
+            const pageSize = 100;
+            let hasMore = true;
+
+            while (hasMore) {
+                const response = await fetchWithAuth(`${BASE_URL}/category/get?page=${page}&size=${pageSize}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+                if (!response.ok) throw new Error(t('fetchError'));
+                const data = await response.json();
+                allCategories = [...allCategories, ...(data.content || [])];
+                setCategories(allCategories);
+                if (data.page?.totalPages && page + 1 < data.page.totalPages) {
+                    page++;
+                } else {
+                    hasMore = false;
+                }
+            }
         } catch (err) {
             console.error('Failed to fetch categories:', err);
             toast.error(t('fetchError'), {
@@ -192,13 +186,26 @@ export default function EquipmentList() {
 
     const fetchLocations = async () => {
         try {
-            const response = await fetchWithAuth(`${BASE_URL}/location/get?page=0&size=100`, {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
-            });
-            if (!response.ok) throw new Error(t('fetchError'));
-            const data = await response.json();
-            setLocations(data.content || []);
+            let allLocations = [];
+            let page = 0;
+            const pageSize = 100;
+            let hasMore = true;
+
+            while (hasMore) {
+                const response = await fetchWithAuth(`${BASE_URL}/location/get?page=${page}&size=${pageSize}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+                if (!response.ok) throw new Error(t('fetchError'));
+                const data = await response.json();
+                allLocations = [...allLocations, ...(data.content || [])];
+                setLocations(allLocations);
+                if (data.page?.totalPages && page + 1 < data.page.totalPages) {
+                    page++;
+                } else {
+                    hasMore = false;
+                }
+            }
         } catch (err) {
             console.error('Failed to fetch locations:', err);
             toast.error(t('fetchError'), {
@@ -247,9 +254,7 @@ export default function EquipmentList() {
     }, [searchQuery, filterLocationId, filterCategoryId, debouncedFetchEquipmentData]);
 
     useEffect(() => {
-
-            debouncedFetchEquipmentData(currentPage);
-
+        debouncedFetchEquipmentData(currentPage);
         return () => debouncedFetchEquipmentData.cancel();
     }, [currentPage, debouncedFetchEquipmentData]);
 
@@ -261,7 +266,7 @@ export default function EquipmentList() {
     useEffect(() => {
         setEquipmentItems({});
         equipmentData.forEach((equipment) => fetchEquipmentItems(equipment.id));
-    }, [equipmentData]);
+    }, [equipmentData, filterLocationId, filterCategoryId]);
 
     const handleAddEquipment = async () => {
         if (!newEquipmentData.name) {
@@ -291,7 +296,6 @@ export default function EquipmentList() {
             const equipmentData = {
                 name: newEquipmentData.name,
                 status: newEquipmentData.status,
-                purchaseDate: newEquipmentData.purchaseDate,
                 description: newEquipmentData.description,
                 quantity: parseInt(newEquipmentData.quantity) || 0,
                 categoryId: parseInt(newEquipmentData.categoryId) || 0,
@@ -335,7 +339,7 @@ export default function EquipmentList() {
                 image: null,
             });
             setIsAddModalOpen(false);
-            fetchEquipmentData(currentPage);
+            await fetchEquipmentData(currentPage);
         } catch (err) {
             console.error('Failed to add equipment:', err);
             toast.error(err.message, {
@@ -377,7 +381,7 @@ export default function EquipmentList() {
                 serialNumber: newEquipmentItemData.serialNumber,
                 status: newEquipmentItemData.status,
                 locationId: parseInt(newEquipmentItemData.locationId) || 0,
-                returnDate: newEquipmentItemData.returnDate || null,
+                purchaseDate: formatDateForAPI(newEquipmentItemData.purchaseDate),
                 equipmentId: parseInt(newEquipmentItemData.equipmentId),
             };
 
@@ -414,10 +418,10 @@ export default function EquipmentList() {
             });
             setIsAddItemModalOpen(false);
             setSelectedEquipmentForItem(null);
-            fetchEquipmentItems(newEquipmentItemData.equipmentId);
-            fetchEquipmentData(currentPage);
+            await fetchEquipmentItems(newEquipmentItemData.equipmentId);
+            await fetchEquipmentData(currentPage);
             if (expandedEquipmentId === newEquipmentItemData.equipmentId) {
-                fetchEquipmentItems(newEquipmentItemData.equipmentId);
+                await fetchEquipmentItems(newEquipmentItemData.equipmentId);
             }
         } catch (err) {
             console.error('Failed to add equipment item:', err);
@@ -460,7 +464,6 @@ export default function EquipmentList() {
             const equipmentData = {
                 name: selectedEquipment.name,
                 status: selectedEquipment.status || 'Active',
-                purchaseDate: selectedEquipment.purchaseDate || new Date().toISOString().slice(0, 16),
                 description: selectedEquipment.description || '',
                 quantity: parseInt(selectedEquipment.quantity) || 1,
                 categoryId: parseInt(selectedEquipment.categoryId) || 1,
@@ -482,8 +485,6 @@ export default function EquipmentList() {
                     throw new Error(`Update fail. Equipment with name ${newEquipmentData.name} already exists`);
                 }
                 throw new Error(`Update fail. ${t('updateError')}`);
-                // const errorText = await response.text();
-                // throw new Error(t('updateError') + ': ' + errorText);
             }
 
             toast.success(t('equipmentUpdatedSuccessfully'), {
@@ -497,10 +498,10 @@ export default function EquipmentList() {
 
             setIsEditModalOpen(false);
             setSelectedEquipment(null);
-            fetchEquipmentData(currentPage);
+            await fetchEquipmentData(currentPage);
 
             if (expandedEquipmentId === selectedEquipment.id) {
-                fetchEquipmentItems(selectedEquipment.id);
+                await fetchEquipmentItems(selectedEquipment.id);
             }
         } catch (err) {
             console.error('Failed to update equipment:', err);
@@ -531,7 +532,7 @@ export default function EquipmentList() {
             const itemData = {
                 serialNumber: selectedEquipmentItem.serialNumber,
                 status: selectedEquipmentItem.status || 'ACTIVE',
-                purchaseDate: selectedEquipmentItem.purchaseDate || null,
+                purchaseDate: formatDateForAPI(selectedEquipmentItem.purchaseDate),
                 locationId: parseInt(selectedEquipmentItem.locationId) || 0,
                 equipmentId: parseInt(selectedEquipmentItem.equipmentId),
             };
@@ -553,10 +554,6 @@ export default function EquipmentList() {
                 body: JSON.stringify(itemData),
             });
 
-            // if (!response.ok) {
-            //     await response.text();
-            //     throw new Error(`Update fail. ${t('updateItemError')}`);
-            // }
             if (!response.ok) {
                 const errorText = await response.text();
                 const errorMessage = JSON.parse(errorText);
@@ -577,7 +574,7 @@ export default function EquipmentList() {
 
             setIsEditItemModalOpen(false);
             setSelectedEquipmentItem(null);
-            fetchEquipmentItems(selectedEquipmentItem.equipmentId);
+            await fetchEquipmentItems(selectedEquipmentItem.equipmentId);
         } catch (err) {
             console.error('Failed to update equipment item:', err);
             toast.error(err.message, {
@@ -588,7 +585,7 @@ export default function EquipmentList() {
                 pauseOnHover: true,
                 draggable: true,
             });
-            fetchEquipmentItems(selectedEquipmentItem.equipmentId);
+            await fetchEquipmentItems(selectedEquipmentItem.equipmentId);
         }
     };
 
@@ -609,7 +606,7 @@ export default function EquipmentList() {
             });
             setIsDeleteModalOpen(false);
             setEquipmentToDelete(null);
-            fetchEquipmentData(currentPage);
+            await fetchEquipmentData(currentPage);
         } catch (err) {
             console.error(err);
             toast.error(err.message, {
@@ -652,7 +649,7 @@ export default function EquipmentList() {
                 draggable: true,
             });
 
-            fetchEquipmentData(currentPage);
+            await fetchEquipmentData(currentPage);
             setIsDeleteItemModalOpen(false);
             setEquipmentItemToDelete(null);
         } catch (err) {
@@ -665,7 +662,7 @@ export default function EquipmentList() {
                 pauseOnHover: true,
                 draggable: true,
             });
-            fetchEquipmentItems(equipmentItemToDelete.equipmentId);
+            await fetchEquipmentItems(equipmentItemToDelete.equipmentId);
         }
     };
 
@@ -677,8 +674,8 @@ export default function EquipmentList() {
                 return 'bg-green-100 text-green-700 border-green-200';
             case 'MAINTENANCE':
                 return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-            case 'BORROWED':
-                return 'bg-blue-100 text-blue-700 border-blue-200';
+            // case 'BORROWED':
+            //     return 'bg-blue-100 text-blue-700 border-blue-200';
             default:
                 return 'bg-gray-100 text-gray-700 border-gray-200';
         }
@@ -715,6 +712,9 @@ export default function EquipmentList() {
                     break;
                 case 'MAINTENANCE':
                     statusCount.MAINTENANCE++;
+                    break;
+                case 'BORROWED':
+                    statusCount.BORROWED++;
                     break;
             }
         });
@@ -759,11 +759,18 @@ export default function EquipmentList() {
         if (!date) return '-';
         try {
             return format(new Date(date), 'dd/MM/yyyy HH:mm');
-        } catch {
+        } catch (error) {
+            console.error('Date formatting error:', error, 'Original date:', date);
             return '-';
         }
     };
-
+    const formatDateForAPI = (dateString) => {
+        if (!dateString) return null;
+        if (dateString.length === 10) {
+            return dateString + 'T00:00:00';
+        }
+        return dateString;
+    };
     const handleOpenAddModal = () => setIsAddModalOpen(true);
     const handleOpenEditModal = (equipment) => {
         const selectedCategory = categories.find((cat) => cat.categoryName === equipment.categoryName);
@@ -958,7 +965,7 @@ export default function EquipmentList() {
                                         ) : t('noImage')}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
-                                        {equipmentQuantities[equipment.id] !== undefined ? equipmentQuantities[equipment.id] : '-'}
+                                        {equipmentItems[equipment.id] ? equipmentItems[equipment.id].length : '0'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         <span className="flex items-center text-center space-x-1">
@@ -973,6 +980,10 @@ export default function EquipmentList() {
                                             <span className={`inline-block px-1 text-xs font-medium ${getStatusColor('MAINTENANCE')}`}>
                                                 {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[2] : '0'}
                                             </span>
+                                            {/*<span className="text-gray-500">/</span>*/}
+                                            {/*<span className={`inline-block px-1 text-xs font-medium ${getStatusColor('BORROWED')}`}>*/}
+                                            {/*    {equipmentItems[equipment.id] ? getStatusDistribution(equipment.id).split('/')[3] : '0'}*/}
+                                            {/*</span>*/}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{equipment.categoryName}</td>
@@ -1053,11 +1064,6 @@ export default function EquipmentList() {
                                                                     <div className="text-sm text-gray-600">
                                                                         <span className="font-medium">{t('location')}:</span> {item.locationName || '-'}
                                                                     </div>
-                                                                    {item.returnDate && (
-                                                                        <div className="text-sm text-gray-600">
-                                                                            <span className="font-medium">{t('returnDate')}:</span> {formatDate(item.returnDate)}
-                                                                        </div>
-                                                                    )}
                                                                 </div>
                                                             </div>
                                                         ))}

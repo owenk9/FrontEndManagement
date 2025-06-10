@@ -37,8 +37,8 @@ export default function AddEquipment({ isOpen, onClose, onSave, newEquipment, on
                         name="categoryId"
                         value={newEquipment.categoryId}
                         onChange={onInputChange}
-                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
-                        required
+                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black overflow-y-auto"
+                        size={categories.length >= 6 ? 6 : 1}
                     >
                         <option value="">{t('selectCategory')}</option>
                         {categories.map((category) => (

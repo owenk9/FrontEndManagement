@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../Auth/AuthContext.jsx';
-import { Bar, Pie } from 'react-chartjs-2'; // Xóa Line vì không còn dùng
+import { Bar, Pie } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
 
-// Đăng ký các thành phần cần thiết cho Chart.js
+
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
 
 export default function Statistics() {
@@ -71,8 +71,6 @@ export default function Statistics() {
                 brokenByTimeResponse.json(),
             ]);
 
-            console.log('Maintenance By Time Data:', maintenanceByTime); // Kiểm tra dữ liệu
-
             setStats({
                 totalEquipment,
                 totalEquipmentItems,
@@ -92,14 +90,33 @@ export default function Statistics() {
         fetchStatistics();
     }, []);
 
-    // Dữ liệu cho biểu đồ phân bố trạng thái (Pie)
+
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'ACTIVE':
+                return '#34D399';
+            case 'BROKEN':
+                return '#EF4444';
+            case 'MAINTENANCE':
+                return '#FBBF24';
+            case 'IN_PROGRESS':
+                return '#3B82F6';
+            case 'COMPLETED':
+                return '#A855F7';
+            case 'FAILED':
+                return '#F87171';
+            default:
+                return '#D1D5DB';
+        }
+    };
+
     const statusChartData = {
         labels: stats.statusDistribution.map((item) => item.status),
         datasets: [
             {
                 label: t('statusDistribution'),
                 data: stats.statusDistribution.map((item) => item.count),
-                backgroundColor: ['#34D399', '#EF4444', '#FBBF24', '#3B82F6', '#A855F7'],
+                backgroundColor: stats.statusDistribution.map((item) => getStatusColor(item.status)),
                 borderColor: '#ffffff',
                 borderWidth: 2,
                 hoverOffset: 10,
@@ -107,23 +124,21 @@ export default function Statistics() {
         ],
     };
 
-    // Dữ liệu cho biểu đồ số lượng bảo trì theo thời gian (Bar thay vì Line)
     const maintenanceByTimeChartData = {
         labels: stats.maintenanceByTime.map((item) => item.period),
         datasets: [
             {
                 label: t('maintenanceByTime'),
                 data: stats.maintenanceByTime.map((item) => item.maintenanceCount),
-                backgroundColor: 'rgba(251, 191, 36, 0.7)', // Màu vàng đậm hơn
+                backgroundColor: 'rgba(251, 191, 36, 0.7)',
                 borderColor: '#FBBF24',
                 borderWidth: 1,
                 barPercentage: 0.8,
-                hoverBackgroundColor: 'rgba(251, 191, 36, 1)', // Hiệu ứng hover
+                hoverBackgroundColor: 'rgba(251, 191, 36, 1)',
             },
         ],
     };
 
-    // Dữ liệu cho biểu đồ chi phí bảo trì theo thời gian (Bar)
     const maintenanceCostByTimeChartData = {
         labels: stats.maintenanceByTime.map((item) => item.period),
         datasets: [
@@ -139,7 +154,6 @@ export default function Statistics() {
         ],
     };
 
-    // Dữ liệu cho biểu đồ số lượng thiết bị hỏng theo thời gian (Bar)
     const brokenByTimeChartData = {
         labels: stats.brokenByTime.map((item) => item.timePeriod),
         datasets: [
@@ -183,7 +197,6 @@ export default function Statistics() {
                 <h1 className="text-3xl font-bold text-gray-900">{t('homePage')}</h1>
             </div>
 
-            {/* Thống kê tổng quan */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
                 <div className="bg-white shadow-lg rounded-lg p-6 flex items-center space-x-4">
                     <div className="p-3 bg-blue-100 rounded-full">
@@ -220,7 +233,6 @@ export default function Statistics() {
                 </div>
             </div>
 
-            {/* Biểu đồ phân bố trạng thái - Pie */}
             <div className="bg-white shadow-lg rounded-lg p-6 mb-8">
                 <h2 className="text-lg font-semibold text-gray-700 mb-4">{t('statusDistribution')}</h2>
                 <div className="h-80 flex justify-center">
@@ -249,7 +261,6 @@ export default function Statistics() {
                 </div>
             </div>
 
-            {/* Biểu đồ số lượng bảo trì theo thời gian - Bar (đã thay đổi từ Line) */}
             <div className="bg-white shadow-lg rounded-lg p-6 mb-8">
                 <h2 className="text-lg font-semibold text-gray-700 mb-4">{t('maintenanceByTime')}</h2>
                 <div className="h-80">
@@ -285,7 +296,6 @@ export default function Statistics() {
                 </div>
             </div>
 
-            {/* Biểu đồ chi phí bảo trì theo thời gian - Bar */}
             <div className="bg-white shadow-lg rounded-lg p-6 mb-8">
                 <h2 className="text-lg font-semibold text-gray-700 mb-4">{t('maintenanceCostByTime')}</h2>
                 <div className="h-80">
@@ -321,7 +331,6 @@ export default function Statistics() {
                 </div>
             </div>
 
-            {/* Biểu đồ số lượng thiết bị hỏng theo thời gian - Bar */}
             <div className="bg-white shadow-lg rounded-lg p-6">
                 <h2 className="text-lg font-semibold text-gray-700 mb-4">{t('brokenByTime')}</h2>
                 <div className="h-80">
