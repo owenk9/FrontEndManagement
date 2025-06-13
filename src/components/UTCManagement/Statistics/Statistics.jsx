@@ -375,6 +375,7 @@ export default function ReportsDashboard() {
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">{t('id')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">{t('equipmentName')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">{t('serialNumber')}</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">{t('locationName')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">{t('maintenanceDate')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">{t('description')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">{t('technician')}</th>
@@ -388,6 +389,7 @@ export default function ReportsDashboard() {
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">{report.id}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">{report.equipmentName}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">{report.serialNumber || 'N/A'}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm">{report.locationName || 'N/A'}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">{formatDateTime(report.maintenanceDate)}</td>
                                     <td className="px-6 py-4 text-sm">{report.description}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">{report.technician}</td>
@@ -498,6 +500,7 @@ export default function ReportsDashboard() {
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">{t('equipmentName')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">{t('serialNumber')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">{t('reportedBy')}</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">{t('locationName')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">{t('brokenDate')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">{t('description')}</th>
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">{t('status')}</th>
@@ -511,6 +514,7 @@ export default function ReportsDashboard() {
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">{report.equipmentName}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">{report.serialNumber}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">{report.fullName}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm">{report.locationName}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">{formatDateTime(report.brokenDate)}</td>
                                     <td className="px-6 py-4 text-sm">{report.description}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">

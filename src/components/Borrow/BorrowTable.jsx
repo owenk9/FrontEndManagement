@@ -28,7 +28,7 @@ export default function BorrowTable({ searchQuery, filterParams, setCategories, 
     const [error, setError] = useState(null);
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
-    const [pageSize] = useState(10);
+    const [pageSize] = useState(6);
 
     const BASE_URL = 'http://localhost:9090';
 

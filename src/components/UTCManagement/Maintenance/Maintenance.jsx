@@ -475,6 +475,7 @@ export default function Maintenance() {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('id')}</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('equipmentName')}</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('serialNumber')}</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('locationName')}</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('maintenanceDate')}</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('description')}</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('status')}</th>
@@ -496,6 +497,7 @@ export default function Maintenance() {
                                 <td className="px-6 py-4 whitespace-nowrap text-sm">{maintenance.id}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm">{maintenance.equipmentName}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm">{maintenance.serialNumber}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">{maintenance.locationName}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm">
                                     {maintenance.maintenanceDate
                                         ? format(new Date(maintenance.maintenanceDate), 'dd/MM/yyyy HH:mm')
